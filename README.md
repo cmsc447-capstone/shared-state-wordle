@@ -1,2 +1,12 @@
-# shared-state-wordle
-Repository for CMSC447 Shared-State Worlde
+# Shared state Worldle
+
+## Contributors
+
+Miguel Leon\
+Abrha Kesetebrhan\
+Jacob Emde\
+Kamalakar Reddy
+
+## Grader
+
+Gaurav Sharma
