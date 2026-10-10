@@ -19,7 +19,7 @@ create table game (
 create table plays (
     user_id     uuid    not null references user(user_id) on delete cascade,
     game_id     uuid    not null references game(game_id) on delete cascade,
-    --turn_order
+    turn_order  integer not null check (turn_order in (1, 2)),
     results     text    check (results in ('win', 'draw', 'loss')),
     primary key (user_id, game_id)
 );
