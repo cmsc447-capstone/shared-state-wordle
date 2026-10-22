@@ -2,10 +2,10 @@
 --
 -- Everything here is fictional: usernames are made-up handles and do not refer to real people.
 -- Generated deterministically, so IDs are stable across resets:
---   users  user_id  00000000-0000-4000-a000-0000000000NN  (NN = 1..50)
---   game   game_id  00000000-0000-4000-b000-000000000NNN  (oldest game = 1)
+--   player  player_id  00000000-0000-4000-a000-0000000000NN  (NN = 1..50)
+--   game    game_id    00000000-0000-4000-b000-000000000NNN  (oldest game = 1)
 --
--- Contents: 861 words, 50 users, 185 games (150 finished, 21 started, 14 waiting), 356 plays, 691 guesses.
+-- Contents: 861 words, 50 players, 185 games (150 finished, 21 started, 14 waiting), 356 plays, 691 guesses.
 --
 -- Conventions assumed by this seed:
 --   * A game allows at most 6 guesses total; players alternate (odd attempts = turn_order 1).
@@ -15,8 +15,11 @@
 --     if nobody solves it in 6 guesses both get 'draw'.
 --   * started: both players joined, game in progress, results are null.
 --   * waiting: only turn_order 1 has joined, no guesses yet, results are null.
---   * Users with no games at all: cinder_crow, fresh_signup_01, fresh_signup_02, greenstreak, lunar_wombat, wordsmith_99.
---   * Some users are in more than one started/waiting game at the same time.
+--   * Players with no games at all: cinder_crow, fresh_signup_01, fresh_signup_02, greenstreak, lunar_wombat, wordsmith_99.
+--   * Some players are in more than one started/waiting game at the same time.
+--   * Players are not inserted directly: each auth.users row fires on_auth_user_created,
+--     which creates the player row (player_id = auth id, username from user metadata).
+--   * Every seeded account can sign in as playerNN@example.com with password 'password123'.
 
 insert into word (word) values
     ('about'), ('above'), ('actor'), ('acute'), ('adapt'), ('adieu'), ('admit'), ('adopt'), ('adult'), ('after'), ('again'), ('agent'),
@@ -92,7 +95,19 @@ insert into word (word) values
     ('woman'), ('world'), ('worry'), ('worse'), ('worst'), ('worth'), ('would'), ('woven'), ('wreck'), ('wrist'), ('write'), ('wrong'),
     ('wrote'), ('yacht'), ('yearn'), ('yeast'), ('yield'), ('young'), ('youth'), ('zebra'), ('zesty');
 
-insert into users (user_id, username, created_at) values
+insert into auth.users (
+    instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+    raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+    confirmation_token, recovery_token, email_change_token_new, email_change
+)
+select
+    '00000000-0000-0000-0000-000000000000', id::uuid, 'authenticated', 'authenticated',
+    'player' || right(id, 2) || '@example.com', extensions.crypt('password123', extensions.gen_salt('bf')),
+    created_at::timestamptz,
+    '{"provider": "email", "providers": ["email"]}', jsonb_build_object('username', username),
+    created_at::timestamptz, created_at::timestamptz,
+    '', '', '', ''  -- GoTrue fails to sign in users whose token columns are null
+from (values
     ('00000000-0000-4000-a000-000000000001', 'pixel_penguin', '2026-09-02 00:44:17+00'),
     ('00000000-0000-4000-a000-000000000002', 'quiet_lantern', '2026-09-07 09:47:55+00'),
     ('00000000-0000-4000-a000-000000000003', 'maple_comet', '2026-09-11 11:05:12+00'),
@@ -142,7 +157,19 @@ insert into users (user_id, username, created_at) values
     ('00000000-0000-4000-a000-000000000047', 'q', '2026-09-08 13:28:49+00'),
     ('00000000-0000-4000-a000-000000000048', 'this_is_an_extremely_long_username_for_testing_ui_overflow', '2026-08-27 14:28:09+00'),
     ('00000000-0000-4000-a000-000000000049', 'fresh_signup_01', '2026-10-16 07:51:00+00'),
-    ('00000000-0000-4000-a000-000000000050', 'fresh_signup_02', '2026-10-16 04:30:00+00');
+    ('00000000-0000-4000-a000-000000000050', 'fresh_signup_02', '2026-10-16 04:30:00+00')
+) as seed_player (id, username, created_at);
+
+-- Email/password sign-in needs a matching identity for each account.
+insert into auth.identities (provider_id, user_id, identity_data, provider, created_at, updated_at)
+select id::text, id, jsonb_build_object('sub', id::text, 'email', email, 'email_verified', true), 'email', created_at, created_at
+from auth.users;
+
+-- The trigger stamps player.created_at with now(); keep the seeded sign-up times instead.
+update player
+set created_at = u.created_at
+from auth.users u
+where u.id = player.player_id;
 
 insert into game (game_id, status, created_at, ended_at) values
     ('00000000-0000-4000-b000-000000000001', 'finished', '2026-08-26 03:49:47+00', '2026-08-26 03:50:43+00'),
@@ -331,7 +358,7 @@ insert into game (game_id, status, created_at, ended_at) values
     ('00000000-0000-4000-b000-000000000184', 'waiting', '2026-10-16 18:58:00+00', null),
     ('00000000-0000-4000-b000-000000000185', 'waiting', '2026-10-16 18:58:00+00', null);
 
-insert into plays (user_id, game_id, turn_order, results) values
+insert into plays (player_id, game_id, turn_order, results) values
     ('00000000-0000-4000-a000-000000000011', '00000000-0000-4000-b000-000000000001', 1, 'win'),
     ('00000000-0000-4000-a000-000000000036', '00000000-0000-4000-b000-000000000001', 2, 'loss'),
     ('00000000-0000-4000-a000-000000000036', '00000000-0000-4000-b000-000000000002', 1, 'loss'),
@@ -876,7 +903,7 @@ insert into answer (game_id, word) values
     ('00000000-0000-4000-b000-000000000184', 'clock'),
     ('00000000-0000-4000-b000-000000000185', 'frost');
 
-insert into guess (game_id, attempt_num, user_id, word, feedback, made_at) values
+insert into guess (game_id, attempt_num, player_id, word, feedback, made_at) values
     ('00000000-0000-4000-b000-000000000001', 1, '00000000-0000-4000-a000-000000000011', 'arose', 'BYYYB', '2026-08-26 03:49:59+00'),
     ('00000000-0000-4000-b000-000000000001', 2, '00000000-0000-4000-a000-000000000036', 'villa', 'BBBBB', '2026-08-26 03:50:06+00'),
     ('00000000-0000-4000-b000-000000000001', 3, '00000000-0000-4000-a000-000000000011', 'sorry', 'GGGGG', '2026-08-26 03:50:41+00'),
