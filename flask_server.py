@@ -12,14 +12,28 @@ import helpers
 
 app = Flask(__name__)
 
+"""
+
+EXAMPLE ENDPOINT
+
 @app.route("/hello", methods=["GET"])
 def hello():
     return jsonify({"message": "Hello!"})
 
+"""
+
 """ USER ROUTES """
 
 # Request to create account
-@app.route("/games", methods=["POST"])
+@app.route("/users", methods=["POST"])
+
+
+# Request to login
+@app.route("/users/login", methods=["POST"])
+
+
+# Request to get user's history
+@app.route("/users/<username>/history", methods=["POST"])
 
 
 """ GAME MANAGEMENT ROUTES """
