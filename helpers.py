@@ -3,3 +3,9 @@
 
 # Generate game id function
 # 
+
+
+def verify_user(username, password):
+    
+
+    return None

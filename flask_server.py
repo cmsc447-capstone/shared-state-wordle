@@ -3,7 +3,7 @@
 
 
 # Imports
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, session
 import helpers
 # IMPORT GAME CLASS
 # IMPORT PLAYER/USER CLASS
@@ -11,6 +11,7 @@ import helpers
 # IMPORT TEAM B's MODULE
 
 app = Flask(__name__)
+SECRET_KEY = ""
 
 """
 
@@ -30,7 +31,25 @@ def hello():
 
 # Request to login
 @app.route("/users/login", methods=["POST"])
+def login():
+    data = request.get_json()
 
+    username = data.get("username")
+    password = data.get("password")
+
+    user = helpers.verify_user(username, password)
+
+    if user is None:
+        return jsonify({"message": "Invalid username or password"}), 401
+
+    # Store user information in the session
+    session["user_id"] = user["id"]
+    session["username"] = user["username"]
+
+    return jsonify({
+        "message": "Login successful",
+        "username": user["username"]
+    }), 200
 
 # Request to get user's history
 @app.route("/users/<username>/history", methods=["POST"])
