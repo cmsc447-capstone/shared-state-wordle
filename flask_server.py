@@ -11,19 +11,6 @@ import helpers
 # IMPORT TEAM B's MODULE
 
 app = Flask(__name__)
-SECRET_KEY = ""
-
-"""
-
-EXAMPLE ENDPOINT
-
-@app.route("/hello", methods=["GET"])
-def hello():
-    return jsonify({"message": "Hello!"})
-
-"""
-
-""" USER ROUTES """
 
 # Request to create account
 @app.route("/users", methods=["POST"])
