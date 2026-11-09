@@ -16,7 +16,6 @@ app = Flask(__name__)
 # TODO: @app.route("/users", methods=["POST"])
 
 # Request to login
-<<<<<<< HEAD
 @app.route("/users/login", methods=["POST"])
 def login():
     data = request.get_json()
