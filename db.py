@@ -15,3 +15,11 @@ def admin() -> Client:
     if _admin is None:
         _admin = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SECRET_KEY"]) # Secret key bypasses RLS
     return _admin
+
+# auth_client is used to create clients specifically for login/authentication
+# This client is created for each login session
+def auth_client() -> Client:
+    return create_client(
+        os.environ["SUPABASE_URL"],
+        os.environ["SUPABASE_PUBLISHABLE_KEY"]
+    )

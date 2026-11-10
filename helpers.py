@@ -1,7 +1,7 @@
 # CMSC 447 - Shared-State Wordle
 # Created: 10/11/26
 
-from db import admin
+from db import admin, auth_client 
 supabase = admin()
 
 def verify_user(username, password):
@@ -15,6 +15,10 @@ def verify_user(username, password):
         .execute()
     )
 
+    # TESTING PRINT STATEMENTS
+    print(response)
+    print(response.data)
+
     if not response.data:
         return None
 
@@ -26,7 +30,7 @@ def verify_user(username, password):
 
     # Authenticate with Supabase Auth
     try:
-        auth_response = supabase.auth.sign_in_with_password({
+        auth_response = auth_client.auth.sign_in_with_password({
             "email": email,
             "password": password
         })
