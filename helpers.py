@@ -51,3 +51,12 @@ def create_game(player_id: str, language: str) -> dict:
         db.table("game").delete().eq("game_id", game_id).execute()
         raise
     return game
+
+def get_game_row(game_id: str) -> dict | None:
+    res = admin().table("game").select("*").eq("game_id", game_id).execute()
+    data = rows(res)
+    return data[0] if data else None
+
+def is_player_in_game(game_id: str, player_id: str) -> bool:
+    res = admin().table("plays").select("player_id").eq("game_id", game_id).eq("player_id", player_id).execute()
+    return len(rows(res)) > 0
