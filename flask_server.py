@@ -5,12 +5,14 @@
 # Imports
 from flask import Flask, request, jsonify, session
 import helpers
+import os
 # IMPORT GAME CLASS
 # IMPORT PLAYER/USER CLASS
 # IMPORT GUESS CLASS
 # IMPORT TEAM B's MODULE
 
 app = Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 # Request to create account
 # TODO: @app.route("/users", methods=["POST"])
@@ -29,7 +31,7 @@ def login():
         return jsonify({"message": "Invalid username or password"}), 401
 
     # Store user information in the session
-    session["user_id"] = user["id"]
+    session["user_id"] = user["user_id"]
     session["username"] = user["username"]
 
     return jsonify({

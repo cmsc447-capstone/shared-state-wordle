@@ -11,6 +11,7 @@ class TestVerifyUser:
         "saffron_sloth",
         "greenstreak"
     ])
+
     def test_valid_credentials(self, username):
         result = verify_user(username, self.TEST_PASSWORD)
 
@@ -23,6 +24,7 @@ class TestVerifyUser:
         "saffron_sloth",
         "greenstreak"
     ])
+    
     def test_invalid_password(self, username):
         result = verify_user(username, "wrong_password")
 
