@@ -53,7 +53,10 @@ def create_game():
     except ValueError as e: # when there is no language or no words for a language
         return jsonify({"error": str(e)}), 400
 
-    return jsonify({"game_id": game["game_id"], "status": game["status"], "language": language}), 201
+    return jsonify({"game_id": game["game_id"],
+                    "status": game["status"],
+                    "language": language,
+                    }), 201
 
 
 # Request to get game's state
@@ -70,7 +73,10 @@ def join_game(game_id):
     except helpers.GameConflict as e:
         return jsonify({"error": str(e)}), 409
 
-    return jsonify({"game_id": game["game_id"], "status": game["status"], "turn_order": 2}), 200
+    return jsonify({"game_id": game["game_id"],
+                    "status": game["status"],
+                    "turn_order": 2,
+                    }), 200
 
 """ GAMEPLAY ROUTES """
 
