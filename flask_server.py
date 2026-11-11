@@ -55,7 +55,17 @@ def create_game():
 # TODO: @app.route("/games/<game_id>", methods=["GET"])
 
 # Request to join a game
-# TODO: @app.route("/games/<game_id>/join", methods=["POST"])
+@app.route("/games/<uuid:game_id>/join", methods=["POST"]) # UUID:game_id Flask's built in UUID converter
+@require_user()
+def join_game(game_id):
+    try:
+        game = helpers.join_game(str(game_id), g.user.id)
+    except helpers.GameNotFound:
+        return jsonify({"error": "game not found"}), 404
+    except helpers.GameConflict as e:
+        return jsonify({"error": str(e)}), 409
+
+    return jsonify({"game_id": game["game_id"], "status": game["status"], "turn_order": 2}), 200
 
 """ GAMEPLAY ROUTES """
 

@@ -1,7 +1,16 @@
 # CMSC 447 - Shared-State Wordle
 import random
 from postgrest.types import CountMethod
+from postgrest.exceptions import APIError
 from db import admin, rows
+
+""" ERRORS """
+
+class GameNotFound(Exception):
+    """No game with that ID"""
+
+class GameConflict(Exception):
+    """Your request could not be completed"""
 
 """ WORD HELPERS """
 
@@ -60,3 +69,24 @@ def get_game_row(game_id: str) -> dict | None:
 def is_player_in_game(game_id: str, player_id: str) -> bool:
     res = admin().table("plays").select("player_id").eq("game_id", game_id).eq("player_id", player_id).execute()
     return len(rows(res)) > 0
+
+def join_game(game_id: str, player_id: str) -> dict:
+    """Adds second player to game with turn 2. Reuturns game row."""
+    db = admin()
+
+    game = get_game_row(game_id)
+    if game is None:
+        raise GameNotFound(game_id)
+    if game["status"] != "waiting":
+        raise GameConflict("Not accepting players") # The game has already been set to "started"
+    if is_player_in_game(game_id, player_id):
+        raise GameConflict("You are already in a game")
+
+    try:
+        db.table("plays").insert({"game_id": game_id, "player_id": player_id, "turn_order": 2}).execute()
+    except APIError as e:
+        if e.code == "23505": # unique_violation
+            raise GameConflict("Match is full") # The game has not yet been set to "started". Race case
+        raise
+    updated = rows(db.table("game").update({"status": "started"}).eq("game_id", game_id).eq("status", "waiting").execute())
+    return updated[0] if updated else game
