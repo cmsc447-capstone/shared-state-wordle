@@ -14,12 +14,8 @@ def verify_user(username, password):
         .maybe_single()
         .execute()
     )
-
-    # TESTING PRINT STATEMENTS
-    print(response)
-    print(response.data)
-
-    if not response.data:
+    
+    if response is None:
         return None
 
     player_id = response.data["player_id"]
@@ -30,7 +26,7 @@ def verify_user(username, password):
 
     # Authenticate with Supabase Auth
     try:
-        auth_response = auth_client.auth.sign_in_with_password({
+        auth_response = auth_client().auth.sign_in_with_password({
             "email": email,
             "password": password
         })
