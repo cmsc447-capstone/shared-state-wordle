@@ -1,10 +1,10 @@
 # CMSC 447 - Shared-State Wordle
 # Created: 10/11/26
 
-
 # Imports
 from flask import Flask, request, jsonify, g
 import helpers
+from werkzeug.exceptions import HTTPException
 from auth import require_user
 # IMPORT GAME CLASS
 # IMPORT PLAYER/USER CLASS
@@ -12,6 +12,11 @@ from auth import require_user
 # IMPORT TEAM B's MODULE
 
 app = Flask(__name__)
+# This might change once we deploy
+# with gunicorn but it also might not...
+@app.errorhandler(HTTPException)
+def handle_http_error(e):
+    return jsonify({"error": e.name}), e.code
 
 """
 
