@@ -58,9 +58,17 @@ def create_game():
                     "language": language,
                     }), 201
 
-
 # Request to get game's state
-# TODO: @app.route("/games/<game_id>", methods=["GET"])
+@app.route("/games/<game_id>", methods=["GET"])
+@require_user()
+def get_game_state(game_id):
+    try:
+        state = helpers.get_game_state(str(game_id), g.user.id)
+    except helpers.GameNotFound:
+        return jsonify({"error": "No game found with that game_id"}), 404
+    except helpers.GameForbidden:
+        return jsonify({"error": "You did not play in this game"}), 403
+    return jsonify(state), 200
 
 # Request to join a game
 @app.route("/games/<uuid:game_id>/join", methods=["POST"]) # UUID:game_id Flask's built in UUID converter
@@ -69,7 +77,7 @@ def join_game(game_id):
     try:
         game = helpers.join_game(str(game_id), g.user.id)
     except helpers.GameNotFound:
-        return jsonify({"error": "game not found"}), 404
+        return jsonify({"error": "No game found with that game_id"}), 404
     except helpers.GameConflict as e:
         return jsonify({"error": str(e)}), 409
 
