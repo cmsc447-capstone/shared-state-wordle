@@ -3,72 +3,67 @@
 
 
 # Imports
+from flask import Flask, request, jsonify, session
+import helpers
 import os
-from collections import defaultdict
-from flask import Flask, jsonify
-from supabase import create_client
-from dotenv import load_dotenv
-
-load_dotenv()
+# IMPORT GAME CLASS
+# IMPORT PLAYER/USER CLASS
+# IMPORT GUESS CLASS
+# IMPORT TEAM B's MODULE
 
 app = Flask(__name__)
-app.secret_key = os.environ["FLASK_SECRET_KEY"]
-supabase = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
+
+# Request to create account
+# TODO: @app.route("/users", methods=["POST"])
+
+# Request to login
+@app.route("/users/login", methods=["POST"])
+def login():
+    data = request.get_json()
+
+    username = data.get("username")
+    password = data.get("password")
+
+    user = helpers.verify_user(username, password)
+
+    if user is None:
+        return jsonify({"message": "Invalid username or password"}), 401
+
+    # Store user information in the session
+    session["user_id"] = user["user_id"]
+    session["username"] = user["username"]
+
+    return jsonify({
+        "message": "Login successful",
+        "username": user["username"]
+    }), 200
+
+# Request to get user's history
+# TODO: @app.route("/users/<username>/history", methods=["POST"])
+
+""" GAME MANAGEMENT ROUTES """
+
+# Request to create a game
+# TODO: @app.route("/games", methods=["POST"])
+#def create_game():
+#    game_id  = helpers.generate_game_id()
+#    # Instantiate Game OBJ
+#    return jsonify({"game_id": game_id}), 201
+
+# Request to get game's state
+# TODO: @app.route("/games/<game_id>", methods=["GET"])
+
+# Request to join a game
+# TODO: @app.route("/games/<game_id>/join", methods=["POST"])
 
 
-@app.route("/users/<username>/history", methods=["GET"])
-def user_history(username):
-    try:
-        # 1. Find the player
-        player_res = (
-            supabase.table("player")
-            .select("player_id, username, created_at, preferred_language_code")
-            .eq("username", username)
-            .maybe_single()
-            .execute()
-        )
-        if player_res is None or player_res.data is None:
-            return jsonify({"message": "User not found"}), 404
-        player = player_res.data
+""" GAMEPLAY ROUTES """
 
-        # 2. Games this player took part in (plays -> game via FK)
-        plays_res = (
-            supabase.table("plays")
-            .select("turn_order, result, game(game_id, status, created_at, ended_at)")
-            .eq("player_id", player["player_id"])
-            .execute()
-        )
+# Request to submit a guess
+# TODO: @app.route("/games/<game_id>/guess", methods=["POST"])
 
-        # 3. This player's guesses
-        guesses_res = (
-            supabase.table("guess")
-            .select("game_id, attempt_number, guessed_word, feedback, created_at")
-            .eq("player_id", player["player_id"])
-            .order("attempt_number")
-            .execute()
-        )
 
-        # Group guesses by game
-        guesses_by_game = defaultdict(list)
-        for g in guesses_res.data:
-            guesses_by_game[g["game_id"]].append(g)
+if __name__ == "__main__":
+    app.run(debug=True)
 
-        history = []
-        for row in plays_res.data:
-            game = row["game"]
-            history.append({
-                **game,
-                "turn_order": row["turn_order"],
-                "result": row["result"],
-                "guesses": guesses_by_game.get(game["game_id"], []),
-            })
-        history.sort(key=lambda g: g["created_at"], reverse=True)
-
-        return jsonify({
-            "username": player["username"],
-            "preferred_language": player["preferred_language_code"],
-            "history": history,
-        }), 200
-
-    except Exception as e:
-        return jsonify({"message": "Database error", "error": str(e)}), 500
