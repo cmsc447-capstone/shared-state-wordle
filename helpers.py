@@ -4,7 +4,7 @@
 from db import admin, auth_client 
 supabase = admin()
 
-def verify_user(username, password):
+def verify_user(username: str, password: str) -> dict[str, str] | None:
     # Find the user's email using their username
     response = (
         supabase
@@ -15,27 +15,32 @@ def verify_user(username, password):
         .execute()
     )
     
-    if response is None:
+    if response is None or not isinstance(response.data, dict):
         return None
 
-    player_id = response.data["player_id"]
+    row = response.data
+    player_id = str(row["player_id"])
+    db_username = str(row["username"])
 
     # Retrieve the user's email from Supabase Auth
     auth_user = admin().auth.admin.get_user_by_id(player_id)
     email = auth_user.user.email
+    if not email:
+        return None
 
     # Authenticate with Supabase Auth
     try:
         auth_response = auth_client().auth.sign_in_with_password({
             "email": email,
-            "password": password
+            "password": password,
         })
-
-        # Return the authenticated user's information
-        return {
-            "user_id": auth_response.user.id,
-            "username": response.data["username"]
-        }
-
     except Exception:
         return None
+
+    if auth_response.user is None:
+        return None
+
+    return {
+        "user_id": auth_response.user.id,
+        "username": db_username,
+    }
