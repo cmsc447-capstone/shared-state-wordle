@@ -16,7 +16,7 @@ def require_user(allow_guests=True): # TODO: We still need to decide who guests 
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
-            # Read token from "Authorization: Dearer <token>" header
+            # Read token from "Authorization: Bearer <token>" header
             header = request.headers.get("Authorization", "") # If header is missing .get returns "" instead of crashing
             if not header.startswith("Bearer "):
                 abort(401)  # 401 Unauthorized. If there is no token, then user is not signed in
