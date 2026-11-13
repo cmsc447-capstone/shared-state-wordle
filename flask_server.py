@@ -61,7 +61,32 @@ def create_game():
                     }), 201
 
 # Request to be matched against another player
-# TODO: @app.route("/games", methods=["GET"])
+@app.route("/games/match", methods=["POST"])
+@require_user()
+def match_game():
+    try:
+        game, matched = helpers.match_player(g.user.id)
+    except helpers.GameConflict as e:
+        return jsonify({"error", str(e)}), 400
+    except ValueError as e: # no words in lang
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"game_id": game["game_id"],
+                    "status": game["status"],
+                    "matched": matched}), 200 if matched else 201
+
+# Request to cancel a game
+@app.route("/games/<uuid:game_id>/cancel", methods=["DELETE"])
+@require_user()
+def cancel_game(game_id):
+    try:
+        helpers.cancel_game(str(game_id), g.user.id)
+    except helpers.GameNotFound:
+        return jsonify({"error": "game not found"}), 404
+    except helpers.GameForbidden:
+        return jsonify({"error", "only host can cancel a game"}), 403
+    except helpers.GameConflict as e:
+        return jsonify({"error": str(e)}), 409
+    return "", 204 # 204 means no content
 
 # Request to get game's state
 @app.route("/games/<uuid:game_id>", methods=["GET"]) # UUID:game_id Flask's built in UUID converter
