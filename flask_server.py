@@ -60,6 +60,9 @@ def create_game():
                     "language": language,
                     }), 201
 
+# Request to be matched against another player
+# TODO: @app.route("/games", methods=["GET"])
+
 # Request to get game's state
 @app.route("/games/<uuid:game_id>", methods=["GET"]) # UUID:game_id Flask's built in UUID converter
 @require_user()

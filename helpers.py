@@ -46,6 +46,10 @@ def get_player_language(player_id: str) -> str: # | None:
 
 """ GAME HELPERS """
 
+#def find_waiting_games(language: str) -> dict:
+#    """ Find other games that are waiting with matching language """
+
+
 def has_open_game(player_id: str) -> bool:
     """ A player may only create one game at a time """
     plays = rows(admin().table("plays")         # SELECT game_id
