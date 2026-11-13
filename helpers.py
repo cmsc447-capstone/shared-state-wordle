@@ -126,6 +126,7 @@ def get_game_state(game_id: str, player_id: str) -> dict:
                 for p in plays]
 
     finished = game["status"] == "finished"
+
     answer = rows(db.table("answer")
                   .select("language, word" if finished else "language")
                   .eq("game_id", game_id)

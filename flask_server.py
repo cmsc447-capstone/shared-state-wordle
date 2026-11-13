@@ -59,7 +59,7 @@ def create_game():
                     }), 201
 
 # Request to get game's state
-@app.route("/games/<game_id>", methods=["GET"])
+@app.route("/games/<uuid:game_id>", methods=["GET"])
 @require_user()
 def get_game_state(game_id):
     try:

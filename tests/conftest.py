@@ -1,6 +1,8 @@
 # CMSC 447 - Shared-State Wordle
 
-# Shared test fixtures. Test will run against your local Supabase stack
+# Shared test fixtures. Test will run against local Supabase stack. Making
+# players, test client, and game is written here once and available for every
+# Players, games do not persist across tests
 # Please ensure that you have ran:
 #   $ supabase start
 # and are using the rights keys in .env
@@ -55,21 +57,21 @@ def client():
         yield c
 
 @pytest.fixture
-def avery():
-    return _sign_up_test_player()
-
-@pytest.fixture
 def sofia():
     return _sign_up_test_player()
 
 @pytest.fixture
-def sam():
+def grace():
+    return _sign_up_test_player()
+
+@pytest.fixture
+def julia():
     return _sign_up_test_player()
 
 @pytest.fixture
 def create_game(client):
     def _create(player, language="eng"):
-        r = client.post("/gaems", json={"language": language}, headers=player["headers"])
+        r = client.post("/games", json={"language": language}, headers=player["headers"])
         assert r.status_code == 201, r.get_json()
         return r.get_json()["game_id"]
     return _create
