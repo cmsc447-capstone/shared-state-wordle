@@ -85,3 +85,32 @@ def test_matched_oldest_game(client, julia, sofia, grace):
     r = client.post("/games/match", headers=grace["headers"])
 
     assert r.get_json()["game_id"] == first["game_id"]  # grace is matched with julia's game
+
+# test matchmaking ingnores invite games
+def test_invite_games_protected(client, grace, julia):
+    invite = helpers.create_game(grace["id"], "eng", mode="invite")
+    r = client.post("/games/match", headers=julia["headers"])
+
+    assert r.status_code == 201
+    assert r.get_json()["status"] == "waiting"
+    assert invite["status"] == "waiting"
+
+# test cannot invte while in game
+def test_invite_while_in_game(client, sofia):
+    client.post("/games/match", headers=sofia["headers"])       # can enter matchmaking
+    r = client.post("/games/match", headers=sofia["headers"])   # cannot enter while already waiting for matchmaking
+
+    assert r.status_code == 409
+    
+# TODO: test cannot enter matchmaking while in game
+
+# TODO: test invite games match host language
+# TODO: test host can cancel matchmaking
+# TODO: test canceled matchmaking deletes game
+
+# TODO: test players can enter matchmaking after canceling
+# TODO: test players can invite after canceling 
+# TODO: test started game cannot be cancelled
+# TODO: test only host can cancel a game
+# TODO: test canceling a non-existent game isn't allowed
+# TODO: test canceling without a token isn't allowed
