@@ -52,6 +52,8 @@ def create_game():
         game = helpers.create_game(g.user.id, language)
     except ValueError as e: # when there is no language or no words for a language
         return jsonify({"error": str(e)}), 400
+    except helpers.GameConflict as e:
+        return jsonify({"error": str(e)}), 409
 
     return jsonify({"game_id": game["game_id"],
                     "status": game["status"],
@@ -59,7 +61,7 @@ def create_game():
                     }), 201
 
 # Request to get game's state
-@app.route("/games/<uuid:game_id>", methods=["GET"])
+@app.route("/games/<uuid:game_id>", methods=["GET"]) # UUID:game_id Flask's built in UUID converter
 @require_user()
 def get_game_state(game_id):
     try:

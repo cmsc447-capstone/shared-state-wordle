@@ -26,16 +26,16 @@ def test_create_game_writes_plays_and_answer(client, sofia, db, db_rows):
     r = client.post("/games", json={"language": "eng"}, headers=sofia["headers"])
     game_id = r.get_json()["game_id"]
 
-    plays = db_rows(db.table("plays")           # FROM plays
-                    .select("*")                # SELECT *
+    plays = db_rows(db.table("plays")           # SELECT *
+                    .select("*")                # FROM plays
                     .eq("game_id", game_id)     # WHERE game_id == game_id
                     .execute())
     assert len(plays) == 1                      # So far only sofia plays in this game
     assert plays[0]["player_id"] == sofia["id"] # sofia ID matches player id in plays as player 1
     assert plays[0]["turn_order"] == 1          # sofia has the first turn
 
-    answer = db_rows(db.table("answer")         # FROM answer
-                     .select("*")               # SELECT *
+    answer = db_rows(db.table("answer")         # SELECT *
+                     .select("*")               # FROM answer 
                      .eq("game_id", game_id)    # WHERE game_id == game_id
                      .execute())
     assert len(answer) == 1                 # this game should only have one answer
@@ -56,8 +56,8 @@ def test_create_game_player_langauge_unknonwn(client, sofia, db , db_rows):
     assert r.status_code == 400 # 400 is the error code for unknown language
     assert "error" in r.get_json()
 
-    plays = db_rows(db.table("plays")               # FROM plays
-                   .select("game_id")               # SELECT game_id
+    plays = db_rows(db.table("plays")               # SELECT game_id
+                   .select("game_id")               # FROM plays 
                    .eq("player_id", sofia["id"])    # WHERE player_id == sofia.id
                    .execute()) 
     assert plays == [] # Failed games should be removed from that database
@@ -109,6 +109,23 @@ def test_join_game_no_token(client, grace, create_game):
     game_id = create_game(grace)
     r = client.post(f"/games/{game_id}/join") # No headers means no token
     assert r.status_code == 401
+
+def test_player_creates_two_games(client, sofia, create_game):
+    create_game(sofia)
+    r = client.post("/games", json={"language": "eng"}, headers=sofia["headers"])
+    assert r.status_code == 409 # you can only create one game at a time
+
+def test_create_after_joining(client, sofia, grace, create_game):
+    game_id = create_game(sofia)
+    client.post(f"/games/{game_id}/join", headers=grace["headers"])
+    r = client.post("/games", json={"language": "eng"}, headers=grace["headers"])
+    assert r.status_code == 409 # you can't create another game if you in an active one (player 2)
+
+def test_create_after_joined(client, sofia, grace, create_game):
+    game_id = create_game(sofia)
+    client.post(f"/games/{game_id}/join", headers=grace["headers"])
+    r = client.post("/games", json={"language": "eng"}, headers=sofia["headers"])
+    assert r.status_code == 409 # you can't create another game if you in an active one (player 1)
 
 """ GET /games/<game_id> """
 

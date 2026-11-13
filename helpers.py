@@ -4,6 +4,8 @@ from postgrest.types import CountMethod
 from postgrest.exceptions import APIError
 from db import admin, rows
 
+OPEN_STATUS = ["waiting", "started"] # anything but finished
+
 """ ERRORS """
 
 class GameNotFound(Exception):
@@ -44,9 +46,29 @@ def get_player_language(player_id: str) -> str: # | None:
 
 """ GAME HELPERS """
 
+def has_open_game(player_id: str) -> bool:
+    """ A player may only create one game at a time """
+    plays = rows(admin().table("plays")         # SELECT game_id
+                 .select("game_id")             # FROM plays
+                 .eq("player_id", player_id)    # WHERE player_id == player_id
+                 .execute())
+    if not plays:
+        return False
+
+    open_games = rows(admin().table("game")                             # SELECT game_id
+                      .select("game_id")                                # FROM game
+                      .in_("game_id", [p["game_id"] for p in plays])    # WHERE game_id IN ( [p["game_id"] for p in plays])
+                      .in_("status", OPEN_STATUS)                       #   AND status IN ('waiting', 'in_progress')
+                      .limit(1)                                         # LIMIT 1
+                      .execute())
+    return len(open_games) > 0
+
 def create_game(player_id: str, language: str) -> dict:
     """ Creates a game, its answer, and the creator's plays(turn 1)
         Only returns the new game row and never the answer """
+    if has_open_game(player_id):
+        raise GameConflict("You have already have an open game")
+    
     db = admin()
 
     # game_id is generated randomly by Postgres with gen_random_uuid()
@@ -70,7 +92,11 @@ def get_game_row(game_id: str) -> dict | None:
     return data[0] if data else None
 
 def is_player_in_game(game_id: str, player_id: str) -> bool:
-    res = admin().table("plays").select("player_id").eq("game_id", game_id).eq("player_id", player_id).execute()
+    res = (admin().table("plays")       # SELECT player_id
+           .select("player_id")         # FROM plays
+           .eq("game_id", game_id)      # WHERE game_id == game_id
+           .eq("player_id", player_id)  #   AND player_id == player_id
+           .execute())
     return len(rows(res)) > 0
 
 def join_game(game_id: str, player_id: str) -> dict:
@@ -111,10 +137,10 @@ def get_game_state(game_id: str, player_id: str) -> dict:
         raise GameNotFound(game_id)
 
     # players, with username pulled from the player table via FK
-    plays = rows(db.table("plays")
-                 .select("player_id, turn_order, results, player(username)")
-                 .eq("game_id", game_id)
-                 .order("turn_order")
+    plays = rows(db.table("plays")                                              # SELECT player_id, turn_order, results, player(username)
+                 .select("player_id, turn_order, results, player(username)")    # FROM plays
+                 .eq("game_id", game_id)                                        # WHERE game_id == game_id
+                 .order("turn_order")                                           # ORDER turn_order
                  .execute())
     if player_id not in {p["player_id"] for p in plays}:
         raise GameForbidden(game_id)
