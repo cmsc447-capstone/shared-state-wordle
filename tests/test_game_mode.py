@@ -80,7 +80,7 @@ def test_game_language(client, julia, grace, db):
 
 def test_matched_oldest_game(client, julia, sofia, grace):
     first  = helpers.create_game(julia["id"], "eng", mode="match")
-    second = helpers.create_game(sofia["id"], "eng", mode="match")
+    helpers.create_game(sofia["id"], "eng", mode="match")
 
     r = client.post("/games/match", headers=grace["headers"])
 
@@ -95,18 +95,61 @@ def test_invite_games_protected(client, grace, julia):
     assert r.get_json()["status"] == "waiting"
     assert invite["status"] == "waiting"
 
-# test cannot invte while in game
-def test_invite_while_in_game(client, sofia):
+# test cannot doubly enter matchmaking
+def test_match_while_in_game(client, sofia):
     client.post("/games/match", headers=sofia["headers"])       # can enter matchmaking
     r = client.post("/games/match", headers=sofia["headers"])   # cannot enter while already waiting for matchmaking
 
     assert r.status_code == 409
     
-# TODO: test cannot enter matchmaking while in game
+# TODO: test cannot invite while in matchmaking
+def test_invite_while_in_matchmaking(client, sofia):
+    client.post("/games/match", headers=sofia["headers"])                         # enter matchmaking
+    r = client.post("/games", json={"language": "eng"}, headers=sofia["headers"]) # attempt to create invite
 
-# TODO: test invite games match host language
-# TODO: test host can cancel matchmaking
-# TODO: test canceled matchmaking deletes game
+    assert r.status_code == 409
+
+# test invite games match host language
+def test_invite_in_host_language(client, julia, sofia, create_game, db):
+    set_language(db, sofia, "esp")                                                              # sofia perfers spanish
+    set_language(db, julia, "eng")                                                              # julia perfers english
+    host = client.post("/games", json={}, headers=sofia["headers"])                             # sofia makes a game
+    assert host.status_code == 201                                                              # sofia waits for julia
+    assert host.get_json()["language"] == "esp"                                                 # check game is in spanish
+    goer = client.post(f"/games/{host.get_json()["game_id"]}/join", headers=julia["headers"])   # julia joins sofia's game
+    assert goer.status_code == 200                                                              # julia joined
+    assert host.get_json()["language"] == "esp"                                                 # game still in spanish
+
+
+# test host can cancel matchmaking
+def test_cancel_matchmaking(client, julia, sofia):
+    make    = client.post("/games/match", headers=julia["headers"])                             # julia enters matchmaking
+    assert make.status_code == 201                                                              # julia waits
+    delete  = client.delete(f"/games/{make.get_json()["game_id"]}", headers=julia["headers"])   # julia leaves matchmaking
+    assert delete.status_code == 204                                                            # deleted successfully
+
+    r       = client.post("/games/match", headers=sofia["headers"])                             # sofia enters matchmaking
+    assert r.status_code == 201                                                                 # sofia waits
+
+# test canceled matchmaking deletes game from game table
+def test_game_deleted(client, grace, db, db_rows):
+    r = client.post("/games/match", headers=grace["headers"])
+    client.delete(f"/games/{r.get_json()["game_id"]}", headers=grace["headers"])
+
+    game = db_rows(db.table("game")
+                   .select("game_id")
+                   .eq("game_id", r.get_json()["game_id"])
+                   .execute())
+    assert game == []   # found no game in game table with that game_id
+
+# test player in pool cannot join a game from invite
+def test_matchmaking_join_invite(client, grace, sofia, create_game):
+    mm = client.post("/games/match", headers=sofia["headers"])   # sofia joins matchmaking
+    assert mm.status_code == 201                                 # sofia waits in matchmaking
+    game_id = create_game(grace)                                # grace creates an invite game
+    r = client.post(f"/games/{game_id}/join", headers=sofia["headers"]) # sofia joins 
+    assert r.status_code == 409
+
 
 # TODO: test players can enter matchmaking after canceling
 # TODO: test players can invite after canceling 

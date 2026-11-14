@@ -75,7 +75,7 @@ def match_game():
                     "matched": matched}), 200 if matched else 201
 
 # Request to cancel a game
-@app.route("/games/<uuid:game_id>/cancel", methods=["DELETE"])
+@app.route("/games/<uuid:game_id>", methods=["DELETE"])
 @require_user()
 def cancel_game(game_id):
     try:

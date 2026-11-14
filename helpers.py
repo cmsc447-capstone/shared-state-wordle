@@ -100,7 +100,7 @@ def cancel_game(game_id: str, player_id: str) -> None:
         raise GameConflict("game already in progress")
 
 def has_open_game(player_id: str) -> bool:
-    """ A player may only create one game at a time """
+    """ A player may only be in one game at a time. Matchmaking opens a game.  """
     plays = rows(admin().table("plays")         # SELECT game_id
                  .select("game_id")             # FROM plays
                  .eq("player_id", player_id)    # WHERE player_id == player_id
@@ -146,6 +146,7 @@ def get_game_row(game_id: str) -> dict | None:
     return data[0] if data else None
 
 def is_player_in_game(game_id: str, player_id: str) -> bool:
+    """ Checks if player is in this specified game """
     res = (admin().table("plays")       # SELECT player_id
            .select("player_id")         # FROM plays
            .eq("game_id", game_id)      # WHERE game_id == game_id
@@ -161,9 +162,13 @@ def join_game(game_id: str, player_id: str) -> dict:
     if game is None:
         raise GameNotFound(game_id)
     if game["status"] != "waiting":
-        raise GameConflict("This game is already in progress") # The game has already been set to "started"
+        raise GameConflict("This game is already in progress")  # The game has already been set to "started"
     if is_player_in_game(game_id, player_id):
-        raise GameConflict("You are already in a game")
+        raise GameConflict("You are already in this game")
+    if has_open_game(player_id):
+        raise GameConflict("You cannot join two games") # XXX: This might create some ambiguity. Being in matchmaking opens
+                                                        # a game, but that might be unclear to the player a solution might
+                                                        # be to delay opening games until two players are paired. 
 
     try:
         db.table("plays").insert({"game_id": game_id, "player_id": player_id, "turn_order": 2}).execute()
