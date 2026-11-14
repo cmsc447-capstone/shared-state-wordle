@@ -67,7 +67,7 @@ def match_game():
     try:
         game, matched = helpers.match_player(g.user.id)
     except helpers.GameConflict as e:
-        return jsonify({"error", str(e)}), 400
+        return jsonify({"error": str(e)}), 409
     except ValueError as e: # no words in lang
         return jsonify({"error": str(e)}), 400
     return jsonify({"game_id": game["game_id"],
