@@ -62,7 +62,26 @@ def login():
 
 # Request to submit a guess
 # TODO: @app.route("/games/<game_id>/guess", methods=["POST"])
+@app.route("/games/<uuid:game_id>/guess", methods=["POST"])
+@require_user()
+def submit_guess(game_id):
+    body = request.get_json(silent=True) or {}
+    word = (body.get("guess") or "").strip().lower()
+    if not word:
+        return jsonify({"error": "guess is required"}), 400
 
+    try:
+        result = helpers.submit_guess(str(game_id), g.user.id, word)
+    except helpers.GameNotFound:
+        return jsonify({"error": "No game found with that game_id"}), 404
+    except helpers.GameForbidden:
+        return jsonify({"error": "You did not play in this game"}), 403
+    except helpers.GameConflict as e:
+        return jsonify({"error": str(e)}), 409
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    return jsonify(result), 201
 
 if __name__ == "__main__":
     app.run(debug=True)
