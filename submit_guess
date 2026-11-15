@@ -1,81 +1,21 @@
-@app.route("/games/<game_id>/guess", methods=["POST"])
-def submit_guess(game_id):
-    username = session.get("username")
-    if not username:
-        return jsonify({"error": "not logged in"}), 401
-
-    data = request.get_json(silent=True) or {}
-    guess_word = (data.get("guess") or "").strip().lower()
-    if not guess_word:
+@app.route("/games/guess", methods=["POST"])
+@require_user()
+def submit_guess():
+    body = request.get_json(silent=True) or {}
+    word = (body.get("guess") or "").strip().lower()
+    if not word:
         return jsonify({"error": "guess is required"}), 400
 
     try:
-        game = helpers.get_game(game_id)
-        players = helpers.get_game_players(game_id)
-        guesses_raw = helpers.get_game_guesses(game_id)
-    except Exception:
-        return jsonify({"error": "unable to load game"}), 500
+        game_id = helpers.find_active_game(g.user.id)
+        result = helpers.submit_guess(game_id, g.user.id, word)
+    except helpers.GameNotFound:
+        return jsonify({"error": "No active game found"}), 404
+    except helpers.GameForbidden:
+        return jsonify({"error": "You did not play in this game"}), 403
+    except helpers.GameConflict as e:
+        return jsonify({"error": str(e)}), 409
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
 
-    if game is None:
-        return jsonify({"error": "game not found"}), 404
-    if game["status"] != "in_progress":
-        return jsonify({"error": "game is not active"}), 400
-
-    usernames = [p["username"] for p in players]
-    if username not in usernames:
-        return jsonify({"error": "you are not a player in this game"}), 403
-
-    players_sorted = sorted(players, key=lambda p: p["turn_order"])
-    current = players_sorted[len(guesses_raw) % 2]
-    if current["username"] != username:
-        return jsonify({"error": "not your turn", "current_turn": current["username"]}), 403
-
-    try:
-        answer_word = helpers.get_game_answer(game_id)
-        language_code = helpers.get_word_language(answer_word["word"])
-    except Exception:
-        return jsonify({"error": "unable to load game language"}), 500
-
-    if not helpers.is_valid_word(guess_word, language_code):
-        return jsonify({"error": "invalid word for this language"}), 400
-
-    try:
-        feedback = team_b.compute_feedback(guess_word, answer_word["word"])
-    except Exception:
-        return jsonify({"error": "unable to compute feedback"}), 500
-
-    attempt_number = len(guesses_raw) + 1
-
-    try:
-        helpers.save_guess(
-            game_id=game_id,
-            username=username,
-            guess_word=guess_word,
-            feedback=feedback,
-            attempt_number=attempt_number,
-        )
-    except Exception:
-        return jsonify({"error": "unable to save guess"}), 500
-
-    won = feedback == ["G", "G", "G", "G", "G"]
-    lost = not won and attempt_number >= 6
-    new_status = "won" if won else ("lost" if lost else "in_progress")
-
-    if won or lost:
-        try:
-            helpers.update_game_status(game_id, new_status)
-            helpers.update_player_results(game_id, winner=username if won else None)
-        except Exception:
-            return jsonify({"error": "unable to update game state"}), 500
-
-    next_player = players_sorted[attempt_number % 2]
-
-    return jsonify({
-        "game_id": game_id,
-        "guess": guess_word,
-        "feedback": feedback,
-        "attempt_number": attempt_number,
-        "status": new_status,
-        "current_turn": next_player["username"],
-        "current_turn_player": next_player["turn_order"],
-    }), 201
+    return jsonify(result), 201
