@@ -20,7 +20,7 @@ class GameForbidden(Exception):
 """ WORD HELPERS """
 
 def pick_answer_word(language: str) -> str:
-    """Returns random word from the word table for a lanaguage"""
+    """ Returns a randomly selected for from the word table for language """
 
     # Total number of words in a language
     count_res = (admin().table("word").select("word", count=CountMethod.exact).eq("language", language).limit(1).execute())
@@ -30,7 +30,12 @@ def pick_answer_word(language: str) -> str:
 
     # Fetch a word at a random position using bounds from total
     offset = random.randrange(total)
-    res = admin().table("word").select("word").eq("language", language).order("word").range(offset, offset).execute()
+    res = (admin().table("word")
+           .select("word")
+           .eq("language", language)
+           .order("word")
+           .range(offset, offset)
+           .execute())
     data = rows(res)
     if not data:
         raise ValueError(f"There are no words available in '{language}'")
@@ -38,11 +43,57 @@ def pick_answer_word(language: str) -> str:
 
 """ PLAYER HELPERS """
 
-def get_player_language(player_id: str) -> str: # | None:
-    """ Returns the player's preferred language code or None if not found. """
-    res = admin().table("player").select("language").eq("player_id", player_id).execute()
+def get_player_language(player_id: str) -> str | None:
+    """ Returns a players preferred language and None if no language has been specified """
+
+    res = (admin()
+           .table("player")
+           .select("language")
+           .eq("player_id", player_id)
+           .execute())
     data = rows(res)
-    return data[0]["language"] # if data else None
+    return data[0]["language"] if data else None
+
+def get_open_game(player_id: str) -> dict | None:
+    """ Returns that game_id and status if a player is in an unfinished game and
+        return None if player has no unfinished games (games_status in OPEN_STATUS)"""
+
+    res = (admin().table("plays")                   # SELECT g.game_id, g.status
+           .select("game!inner(game_id, status)")   # FROM plays AS p JOIN game AS g ON g.game_id = p.game_id
+           .eq("player_id", player_id)              # WHERE p.player_id = player_id
+           .in_("game.status", OPEN_STATUS)         #   AND g.status IN ('waiting', 'started')
+           .limit(1)                                # LIMIT 1
+           .execute())
+    data = rows(res)
+    return data[0]["game"] if data else None
+
+def release_player (player_id: str, join: str | None = None) -> None:
+    """ Frees a player to start a different action. This function drops whatever the player was
+        waiting, so that they can join a different game """
+
+    game = get_open_game(player_id)                             # 1. Find the players unfinished games. If the player
+    if game is not None:                                        #    has no unfinished games. Then game = None 
+        if game["game_id"] == join:                             # 2. If the game they want to leave is same game they
+            raise GameConflict("You are already in this game")  #    want to join refuse the request
+        if game["status"] != "waiting":                         # 3. If the game they want to leave has a status of
+            raise GameConflict("You are already in a game")     #    'started' refuse the request
+        try:                                                    # 4. If the game they want to leave hasn't started
+            cancel_game(game["game_id"], player_id)             #    and isn't the same game they want to join
+        except GameNotFound:                                    #    then cancel the game
+            pass
+    leave_queue(player_id)
+
+""" MATCHMAKING QUEUE HELPERS """
+
+def leave_queue(player_id: str) -> None:
+    """ Removes the player from the matchmaking queue. Their row is deleted from 
+        matchmaking_queue table. If no player_id is found in this table nothing
+        happens. This function is safe to call even if player_id is not it table """
+
+    (admin().table("matchmaking_queue")     
+     .delete()                              # DELETE FROM matchmaking_queue
+     .eq("player_id", player_id)            # WHERE player_id = player_id
+     .execute())
 
 """ GAME HELPERS """
 
@@ -79,16 +130,17 @@ def cancel_game(game_id: str, player_id: str) -> None:
     if game is None:
         raise GameNotFound(game_id)
 
+    # Find the host of the game (player with turn = 1 for invite games)
     host = rows(db.table("plays")       # SELECT player_id
                 .select("player_id")    # FROM plays
                 .eq("game_id", game_id) # WHERE game_id = game_id
                 .eq("turn_order", 1)    #   AND turn_order = 1
                 .execute())
 
-    if not host or host[0]["player_id"] != player_id:
-        raise GameForbidden(game_id)
-    if game["status"] != "waiting":
-        raise GameConflict("you cannot canel this game")
+    if not host or host[0]["player_id"] != player_id:       # If the player_id does not match the host
+        raise GameForbidden(game_id)                        # then they do not have permission to cancel
+    if game["status"] != "waiting":                         # the game. Similarly, if the game has status
+        raise GameConflict("you cannot cancel this game")    # 'started' nobody has permission to cancel
 
     deleted = rows(db.table("game")         # DELETE
                    .delete()                # FROM game
@@ -96,8 +148,8 @@ def cancel_game(game_id: str, player_id: str) -> None:
                    .eq("status", "waiting") #   AND status = 'waiting'
                    .execute())
 
-    if not deleted:
-        raise GameConflict("game already in progress")
+    if not deleted:                                         # If the game status is updated to 'started' between when we
+        raise GameConflict("game already in progress")      # checked permissions and took action then deletion will fail
 
 def has_open_game(player_id: str) -> bool:
     """ A player may only be in one game at a time. Matchmaking opens a game.  """
