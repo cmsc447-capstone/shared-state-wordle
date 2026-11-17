@@ -18,16 +18,6 @@ app = Flask(__name__)
 def handle_http_error(e):
     return jsonify({"error": e.name}), e.code
 
-"""
-
-EXAMPLE ENDPOINT
-
-@app.route("/hello", methods=["GET"])
-def hello():
-    return jsonify({"message": "Hello!"})
-
-"""
-
 """ USER ROUTES """
 
 # Request to create account
@@ -41,80 +31,27 @@ def hello():
 
 """ GAME MANAGEMENT ROUTES """
 
-# Request to create a game
-@app.route("/games", methods=["POST"])
-@require_user()
-def create_game():
-    body = request.get_json(silent=True) or {}
-    language = body.get("language") or helpers.get_player_language(g.user.id)
+# Request to get a game's state
+# TODO: @app.route("/games/<uuid:game_id>", methods=["GET"])
 
-    try:
-        game = helpers.create_game(g.user.id, language)
-    except ValueError as e: # when there is no language or no words for a language
-        return jsonify({"error": str(e)}), 400
-    except helpers.GameConflict as e:
-        return jsonify({"error": str(e)}), 409
-
-    return jsonify({"game_id": game["game_id"],
-                    "status": game["status"],
-                    "language": language,
-                    }), 201
+""" MATCHMAKING ROUTES """
 
 # Request to be matched against another player
-@app.route("/games/match", methods=["POST"])
-@require_user()
-def match_game():
-    try:
-        game, matched = helpers.match_player(g.user.id)
-    except helpers.GameConflict as e:
-        return jsonify({"error": str(e)}), 409
-    except ValueError as e: # no words in lang
-        return jsonify({"error": str(e)}), 400
-    return jsonify({"game_id": game["game_id"],
-                    "status": game["status"],
-                    "matched": matched}), 200 if matched else 201
+# TODO: @app.route("/games/match", methods=["POST"])
 
-# Request to cancel a game
-@app.route("/games/<uuid:game_id>", methods=["DELETE"])
-@require_user()
-def cancel_game(game_id):
-    try:
-        helpers.cancel_game(str(game_id), g.user.id)
-    except helpers.GameNotFound:
-        return jsonify({"error": "game not found"}), 404
-    except helpers.GameForbidden:
-        return jsonify({"error", "only host can cancel a game"}), 403
-    except helpers.GameConflict as e:
-        return jsonify({"error": str(e)}), 409
-    return "", 204 # 204 means no content
+# Request to leave matchmaking
+# TODO: @app.route("/games/match", methods=["DELETE"])
 
-# Request to get game's state
-@app.route("/games/<uuid:game_id>", methods=["GET"]) # UUID:game_id Flask's built in UUID converter
-@require_user()
-def get_game_state(game_id):
-    try:
-        state = helpers.get_game_state(str(game_id), g.user.id)
-    except helpers.GameNotFound:
-        return jsonify({"error": "No game found with that game_id"}), 404
-    except helpers.GameForbidden:
-        return jsonify({"error": "You did not play in this game"}), 403
-    return jsonify(state), 200
+""" INVITE ROUTES """
 
-# Request to join a game
-@app.route("/games/<uuid:game_id>/join", methods=["POST"]) # UUID:game_id Flask's built in UUID converter
-@require_user()
-def join_game(game_id):
-    try:
-        game = helpers.join_game(str(game_id), g.user.id)
-    except helpers.GameNotFound:
-        return jsonify({"error": "No game found with that game_id"}), 404
-    except helpers.GameConflict as e:
-        return jsonify({"error": str(e)}), 409
+# Request to create an invite game
+# TODO: app.route("/games", methods=["POST"])
 
-    return jsonify({"game_id": game["game_id"],
-                    "status": game["status"],
-                    "turn_order": 2,
-                    }), 200
+# Request to cancel an invite game
+# TODO: app.route("/games", methods=["DELETE"])
+
+# Request to join an invite game
+# TODO: app.route("/games/<uuid:game_id/join", methods=["POST"])
 
 """ GAMEPLAY ROUTES """
 
