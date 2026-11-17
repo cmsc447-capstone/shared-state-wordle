@@ -2,22 +2,18 @@ import pytest
 import helpers
 
 
-# ---------------------------------------------------------------------------
-# submit_guess: core gameplay
-# ---------------------------------------------------------------------------
-
 def test_win_and_report_winner(sb, seeded_game):
-    """alice wins on 2nd try, bob exhausts → alice wins, response names her."""
+    """alice wins on 2nd try, bob exhausts 6 → alice wins, named in response."""
     helpers.submit_guess(seeded_game, 1, "stone")
     helpers.submit_guess(seeded_game, 2, "stone")
     r1 = helpers.submit_guess(seeded_game, 1, "apple")   # alice 2nd — in progress
     assert r1["status"] == "in_progress"
     assert r1["winner"] is None
 
-    # bob uses his remaining 5 guesses, none correct
-    for _ in range(5):
+    # bob already has 1 guess; give him 4 more, then a 6th to end
+    for _ in range(4):
         helpers.submit_guess(seeded_game, 2, "stone")
-    r2 = helpers.submit_guess(seeded_game, 2, "stone")   # bob 6th wrong → both done
+    r2 = helpers.submit_guess(seeded_game, 2, "stone")   # bob's 6th
     assert r2["status"] == "won"
     assert r2["winner"] == "alice"
     assert r2["current_turn"] is None
@@ -82,10 +78,6 @@ def test_cannot_guess_on_finished_game(sb, seeded_game):
     with pytest.raises(helpers.GameConflict, match="already ended"):
         helpers.submit_guess(seeded_game, 1, "stone")
 
-
-# ---------------------------------------------------------------------------
-# find_active_game
-# ---------------------------------------------------------------------------
 
 def test_find_active_game_for_each_player(sb, seeded_game):
     assert helpers.find_active_game(1) == seeded_game
