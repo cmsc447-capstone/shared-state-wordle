@@ -65,7 +65,7 @@ def join_matchmaking():
 @require_user()
 def leave_matchmaking():
     helpers.leave_queue(g.user.id)
-    return "", 204 # Always returns the same result where or not player was queued
+    return jsonify(), 204 # Always returns the same result where or not player was queued
 
 """ INVITE ROUTES """
 
@@ -73,10 +73,29 @@ def leave_matchmaking():
 # TODO: app.route("/games", methods=["POST"])
 
 # Request to cancel an invite game
-# TODO: app.route("/games", methods=["DELETE"])
+app.route("/games", methods=["DELETE"])
+@require_user()
+def cancel_game(game_id):
+    try:
+        helpers.cancel_game(str(game_id), g.user.id)
+    except helpers.GameNotFound:
+        return jsonify({"error": "No game found with that game_id"}), 404
+    except helpers.GameForbidden:
+        return jsonify({"error": "Only the host can canel this game"}), 403
+    except helpers.GameConflict as e:
+        return jsonify({"error": str(e)}), 409
+    return jsonify(), 204
 
 # Request to join an invite game
-# TODO: app.route("/games/<uuid:game_id/join", methods=["POST"])
+app.route("/games/<uuid:game_id/join", methods=["POST"])
+@require_user()
+def join_game(game_id):
+    try:
+        game = helpers.join_invite_game(str(game_id), g.user.id)
+    except helpers.GameNotFound:
+        return jsonify({"error": "No game found with that game_id"}), 404
+    except helpers.GameConflict as e:
+        return jsonify({"error": str(e)}), 409
 
 """ GAMEPLAY ROUTES """
 
