@@ -1,12 +1,7 @@
-# ============================================================
-# submit_guess helpers
-# ============================================================
-
 import os
 from supabase import create_client
 import team_b
 
-# only keep these if your helpers.py doesn't already define them
 class GameNotFound(Exception): pass
 class GameForbidden(Exception): pass
 class GameConflict(Exception): pass
@@ -19,25 +14,15 @@ def _client():
 
 
 def find_active_game(user_id):
-    """Find the user's in-progress game and return its game_id.
-
-    Raises:
-        GameNotFound - user isn't playing in any active game
-    """
+    """Find the user's in-progress game and return its game_id."""
     c = _client()
     plays = c.table("plays").select("game_id").eq("player_id", user_id).execute().data
     if not plays:
         raise GameNotFound()
-
     game_ids = [p["game_id"] for p in plays]
     games = (
-        c.table("game")
-        .select("*")
-        .in_("game_id", game_ids)
-        .eq("status", "in_progress")
-        .order("created_at", desc=True)
-        .execute()
-        .data
+        c.table("game").select("*").in_("game_id", game_ids)
+        .eq("status", "in_progress").order("created_at", desc=True).execute().data
     )
     if not games:
         raise GameNotFound()
@@ -51,15 +36,6 @@ def submit_guess(game_id, user_id, word):
       - Each player gets up to 6 guesses; they stop on a correct guess.
       - Game ends when BOTH players have finished.
       - Outcome: fewer attempts wins; equal = draw; both exhausted = draw.
-
-    Returns:
-        {game_id, guess, feedback, attempt_number, status, winner, current_turn}
-
-    Raises:
-        GameNotFound  - no game with that id
-        GameForbidden - user isn't in the game
-        GameConflict  - game ended / not this user's turn / no answer set
-        ValueError    - word not in the dictionary
     """
     c = _client()
 
@@ -77,7 +53,38 @@ def submit_guess(game_id, user_id, word):
         raise GameForbidden()
 
     game_guesses = c.table("game_guess").select("*").eq("game_id", game_id).execute().data
-    current = players[len(game_guesses) % len(players)]
+    game_attempt_ids = {g["attempt_number"] for g in game_guesses}
+
+    # per-player state
+    guesses_by_player = {}
+    won_on_nth = {}
+    finished_ids = set()
+    for p in players:
+        pid = p["player_id"]
+        made = c.table("made_by").select("attempt_number").eq("player_id", pid).execute().data
+        ids = sorted(m["attempt_number"] for m in made if m["attempt_number"] in game_attempt_ids)
+        guesses_by_player[pid] = ids
+        won_nth = None
+        for idx, an in enumerate(ids, start=1):
+            row = c.table("guess").select("feedback").eq("attempt_number", an).execute().data
+            if row and all(f == "G" for f in row[0]["feedback"]):
+                won_nth = idx
+                break
+        won_on_nth[pid] = won_nth
+        if won_nth is not None or len(ids) >= 6:
+            finished_ids.add(pid)
+
+    def next_unfinished():
+        n = sum(len(v) for v in guesses_by_player.values())
+        for offset in range(len(players) * 2):
+            candidate = players[(n + offset) % len(players)]
+            if candidate["player_id"] not in finished_ids:
+                return candidate
+        return None
+
+    current = next_unfinished()
+    if current is None:
+        raise GameConflict("game already ended")
     if current["player_id"] != user_id:
         raise GameConflict("not your turn")
 
@@ -99,31 +106,18 @@ def submit_guess(game_id, user_id, word):
     c.table("guessed").insert({"attempt_number": attempt_number, "word": word}).execute()
     c.table("game_guess").insert({"game_id": game_id, "attempt_number": attempt_number}).execute()
 
-    # --- tally every player in this game ---
-    game_attempt_ids = {g["attempt_number"] for g in game_guesses} | {attempt_number}
-    per_player = {}
-    for p in players:
-        made = c.table("made_by").select("attempt_number").eq("player_id", p["player_id"]).execute().data
-        ids = sorted(m["attempt_number"] for m in made if m["attempt_number"] in game_attempt_ids)
-        finished = False
-        won_on_nth = None
-        for idx, an in enumerate(ids, start=1):
-            row = c.table("guess").select("feedback").eq("attempt_number", an).execute().data
-            if row and all(f == "G" for f in row[0]["feedback"]):
-                finished = True
-                won_on_nth = idx
-                break
-        if not finished and len(ids) >= 6:
-            finished = True
-        per_player[p["player_id"]] = {"finished": finished, "won_on_nth": won_on_nth}
+    # update this player's tally
+    guesses_by_player[user_id].append(attempt_number)
+    if all(f == "G" for f in feedback):
+        won_on_nth[user_id] = len(guesses_by_player[user_id])
+        finished_ids.add(user_id)
+    elif len(guesses_by_player[user_id]) >= 6:
+        finished_ids.add(user_id)
 
-    everyone_finished = all(r["finished"] for r in per_player.values())
-
-    if everyone_finished:
-        a, b = list(per_player.keys())
-        a_win = per_player[a]["won_on_nth"]
-        b_win = per_player[b]["won_on_nth"]
-
+    # is the game over?
+    if len(finished_ids) == len(players):
+        a, b = players[0]["player_id"], players[1]["player_id"]
+        a_win, b_win = won_on_nth[a], won_on_nth[b]
         if a_win is not None and b_win is not None:
             if a_win < b_win:
                 outcome = {a: "won", b: "lost"}
@@ -138,30 +132,23 @@ def submit_guess(game_id, user_id, word):
         else:
             outcome = {a: "draw", b: "draw"}
 
-        winner_id = next((pid for pid, res in outcome.items() if res == "won"), None)
+        winner_id = next((pid for pid, r in outcome.items() if r == "won"), None)
         new_status = "won" if winner_id is not None else "draw"
-
         c.table("game").update({"status": new_status}).eq("game_id", game_id).execute()
-        for pid, res in outcome.items():
-            c.table("plays").update({"result": res}) \
-                .eq("game_id", game_id).eq("player_id", pid).execute()
+        for pid, r in outcome.items():
+            c.table("plays").update({"result": r}).eq("game_id", game_id).eq("player_id", pid).execute()
+        current_turn = None
     else:
         winner_id = None
         new_status = "in_progress"
+        nxt = next_unfinished()
+        current_turn = nxt["player_id"] if nxt else None
 
-    # winner's username so the client can display "alice won"
     winner_username = None
     if winner_id is not None:
         row = c.table("player").select("username").eq("player_id", winner_id).execute().data
         if row:
             winner_username = row[0]["username"]
-
-    # next player's id, or None if game is over
-    if everyone_finished:
-        current_turn = None
-    else:
-        next_player = players[(len(game_guesses) + 1) % len(players)]
-        current_turn = next_player["player_id"]
 
     return {
         "game_id": game_id,
