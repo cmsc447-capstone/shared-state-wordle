@@ -2,7 +2,7 @@
 # Created: 10/11/26
 
 # Imports
-from flask import Flask, request, jsonify, g
+from flask import Flask, jsonify, g
 import helpers
 from werkzeug.exceptions import HTTPException
 from auth import require_user
@@ -70,7 +70,27 @@ def leave_matchmaking():
 """ INVITE ROUTES """
 
 # Request to create an invite game
-# TODO: app.route("/games", methods=["POST"])
+app.route("/games", methods=["POST"])
+@require_user()
+def create_invite():
+    language = helpers.get_player_language(g.user.id)
+
+    # NOTE: None does not mean no language was found, players always are required
+    # to have a language preference set. None is returned when no player is found
+    if language is None:
+        return jsonify({"error": "No player found for this account"}), 404
+
+    try:
+        game = helpers.create_invite_game(g.user.id, language)
+    except ValueError as e: # When there are no words for a language
+        return jsonify({"error": str(e)}), 400
+    except helpers.GameConflict as e:
+        return jsonify({"error": str(e)}), 409
+
+    return jsonify({"game_id": game["game_id"],
+                    "status": game["status"],
+                    "language": language,
+                    }), 201
 
 # Request to cancel an invite game
 app.route("/games", methods=["DELETE"])
@@ -96,6 +116,11 @@ def join_game(game_id):
         return jsonify({"error": "No game found with that game_id"}), 404
     except helpers.GameConflict as e:
         return jsonify({"error": str(e)}), 409
+
+    return jsonify({"game_id": game["game_id"],
+                    "status": game["status"],
+                    "turn_order": 2,
+                    }), 200
 
 """ GAMEPLAY ROUTES """
 
