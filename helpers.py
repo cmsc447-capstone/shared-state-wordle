@@ -351,7 +351,7 @@ def get_game_state(game_id: str, player_id: str) -> dict:
     guesses = rows(db.table("guess")
                    .select("attempt_num, player_id, word, feedback, made_at")
                    .eq("game_id", game_id)
-                   .order("attempt_num")
+                   .order("made_at")
                    .execute())
 
     state = {
@@ -359,11 +359,11 @@ def get_game_state(game_id: str, player_id: str) -> dict:
         "status": game["status"],
         "created_at": game["created_at"],
         "ended_at": game["ended_at"],
-        "language": answer[0]["language"] if answer else None,
+        "language": answer[0]["language"],
         "players": players,
         "guesses": guesses,
         "current_turn" : whose_turn(players, guesses) if game["status"] == "started" else None,
     }
-    if finished and answer:
+    if finished:
         state["answer"] = answer[0]["word"]
     return state
