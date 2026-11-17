@@ -97,8 +97,15 @@ def in_queue(player_id: str) -> bool:
            .execute())
     return len(rows(res)) > 0
 
-def join_queue(player_id: str, language: str) -> None:
+def join_queue(player_id: str, language: str, joined_at: str | None = None) -> None:
     """ Insert the player and their language into the matchmaking queue """
+
+    # Opponents that are removed from the queue but are not successfully placed into a
+    # game keep their original joined_at timestamp. If joined_at is none the column's
+    # default now() is applied
+    ticket = {"player_id": player_id, "language": language}
+    if joined_at is not None:
+        ticket["joined_at"] = joined_at
 
     try:
         (admin().table("matchmaking_queue")     # INSERT INTO matchmaking_queue
@@ -179,7 +186,7 @@ def match_player(player_id: str) -> dict | None:
     try:
         return start_mm_match(player_id, opponent["player_id"], language)
     except Exception:
-        join_queue(opponent["player_id"], opponent["language"]) 
+        join_queue(opponent["player_id"], opponent["language"], opponent["joined_at"]) 
         raise
 
 """ INVITE GAME HELPERS """
