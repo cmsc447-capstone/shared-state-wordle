@@ -70,7 +70,7 @@ def leave_matchmaking():
 """ INVITE ROUTES """
 
 # Request to create an invite game
-app.route("/games", methods=["POST"])
+@app.route("/games", methods=["POST"])
 @require_user()
 def create_invite():
     language = helpers.get_player_language(g.user.id)
@@ -93,7 +93,7 @@ def create_invite():
                     }), 201
 
 # Request to cancel an invite game
-app.route("/games", methods=["DELETE"])
+@app.route("/games", methods=["DELETE"])
 @require_user()
 def cancel_game(game_id):
     try:
@@ -107,7 +107,7 @@ def cancel_game(game_id):
     return jsonify(), 204
 
 # Request to join an invite game
-app.route("/games/<uuid:game_id/join", methods=["POST"])
+@app.route("/games/<uuid:game_id/join", methods=["POST"])
 @require_user()
 def join_game(game_id):
     try:
