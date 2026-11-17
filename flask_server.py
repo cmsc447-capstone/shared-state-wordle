@@ -32,15 +32,40 @@ def handle_http_error(e):
 """ GAME MANAGEMENT ROUTES """
 
 # Request to get a game's state
-# TODO: @app.route("/games/<uuid:game_id>", methods=["GET"])
+@app.route("/games/<uuid:game_id>", methods=["GET"])
+@require_user()
+def get_game_state(game_id):
+    try:
+        state = helpers.get_game_state(str(game_id), g.user.id)
+    except helpers.GameNotFound:
+        return jsonify({"error": "No game found with that game_id"}), 404
+    except helpers.GameForbidden:
+        return jsonify({"error": "You did not play in this game"}), 403
+    return jsonify(state), 200
 
 """ MATCHMAKING ROUTES """
 
 # Request to be matched against another player
-# TODO: @app.route("/games/match", methods=["POST"])
+@app.route("/games/match", methods=["POST"])
+@require_user()
+def join_matchmaking():
+    try:
+        game = helpers.match_player(g.user.id)
+    except helpers.GameConflict as e:
+        return jsonify({"error": str(e)}), 409
+    except ValueError as e: # no words in lang
+        return jsonify({"error": str(e)}), 400
+
+    if game is None:
+        return jsonify({"queued": True, "game_id": None}), 202
+    return jsonify({"queued": False, "game_id": game["game_id"]}), 201
 
 # Request to leave matchmaking
-# TODO: @app.route("/games/match", methods=["DELETE"])
+@app.route("/games/match", methods=["DELETE"])
+@require_user()
+def leave_matchmaking():
+    helpers.leave_queue(g.user.id)
+    return "", 204 # Always returns the same result where or not player was queued
 
 """ INVITE ROUTES """
 
