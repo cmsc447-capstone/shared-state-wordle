@@ -35,7 +35,7 @@ def _sign_up_test_player() -> dict:
 
     token = res.session.access_token
     return {
-        "id": res.user.id,
+        "player_id": res.user.id,
         "username": username,
         "token": token,
         "headers": {"Authorization": f"Bearer {token}"},
