@@ -4,18 +4,15 @@
 
 ### GET /games/\<game_id\>
 
-Returns the current state of a game. It is only available to players who have participated the game.
+Returns the current state of a game. It is **only** available to players who have participated the game.
 
 | STATUS | BODY          | WHEN |
 | ------ | ------------- | ---- |
 | 200    | **SEE BELOW** | On success |
+| 403    | `{"error": "You did not play in this game"}` | If an unauthorized user is attempting to get the game state.
+| 404    | `{"error": "No game found with that game_id"}` | If the game_id is not listed in the database.
 
-
-Upon success you can expect the following output. Please note that order of the keys might not be exactly as described below (with the exception of "players", and "guesses"). *However*, there are a few fields which you can expect to differ regularly.
-
-- `"ended_at"` will be null if the game was not finished.
-- `"current_turn"` on exists once two players are in a game
-- `"answer"` only appears when `"status" = "finsihed"`
+The following output is what you can expect to recieve on successful calls. Please note that the order of the keys might not match exactly as described/
 
 ```json
 {
