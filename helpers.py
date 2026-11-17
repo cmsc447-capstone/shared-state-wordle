@@ -85,6 +85,26 @@ def release_player (player_id: str, join: str | None = None) -> None:
 
 """ MATCHMAKING QUEUE HELPERS """
 
+def in_queue(player_id: str) -> bool:
+    """ Returns true is the player is currently listed in the queue """
+
+    res = (admin().table("matchmaking_queue")   # SELECT player_id
+           .select("player_id")                 # FROM matchmaking_queue
+           .eq("player_id", player_id)          # WHERE player_id = player_id
+           .execute())
+    return len(rows(res)) > 0
+
+def join_queue(player_id: str, language: str) -> None:
+    """ Insert the player and their language into the matchmaking queue """
+
+    try:
+        (admin().table("matchmaking_queue")     # INSERT INTO matchmaking_queue
+         .insert({"player_id": player_id, "language": language})           # (player_id, language)
+         .execute())
+    except APIError as e:
+        if e.code != "23505": # unique_violation: Insertion failed because player is already in queue
+            raise
+
 def leave_queue(player_id: str) -> None:
     """ Removes the player from the matchmaking queue. Their row is deleted from 
         matchmaking_queue table. If no player_id is found in this table nothing
@@ -96,18 +116,6 @@ def leave_queue(player_id: str) -> None:
      .execute())
 
 """ GAME HELPERS """
-
-def find_waiting_games(language: str) -> list[str]:
-    """ Find other games that are waiting with matching language, up to 5"""
-    res = (admin().table("game")                        # SELECT g.game_id, a.language 
-           .select("game_id, answer!inner(language)")   # FROM game as g JOIN answer as a ON a.game_id = g.game_id
-           .eq("status", "waiting")                     # WHERE g.status   = 'waiting'
-           .eq("mode", "match")                         #   AND g.mode     = 'match'
-           .eq("answer.language", language)             #   AND a.language = language
-           .order("created_at")                         # ORDER BY g.created_at
-           .limit(5)                                    # LIMTI 5
-           .execute())
-    return [g["game_id"] for g in rows(res)] 
 
 def match_player(player_id: str) -> tuple[dict, bool]:
     if has_open_game(player_id):
