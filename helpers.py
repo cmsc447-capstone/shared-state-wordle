@@ -165,34 +165,7 @@ def match_player(player_id: str) -> dict | None:
         join_queue(opponent_id, language) # XXX 
         raise
 
-""" INVITE GAME HELPERS """
-
-# reserve for intivte games 
-def create_game(player_id: str, language: str) -> dict:
-    """ Creates a game, its answer, and the creator's plays row
-        (turn 1_). Only returns the new game row and never the
-        answer. 'invite (shared by game_id) or 'match' (in pool) """
-    if has_open_game(player_id):
-        raise GameConflict("You have already have an open game")
-    
-    db = admin()
-
-    # game_id is generated randomly by Postgres with gen_random_uuid()
-    game = rows(db.table("game").insert({"status": "waiting"}).execute())[0]
-    game_id = game["game_id"]
-
-    try:
-        word = pick_answer_word(language)
-        db.table("answer").insert({"game_id": game_id, "word": word, "language": language}).execute()
-        db.table("plays").insert({"game_id": game_id, "player_id": player_id, "turn_order":1}).execute()
-    except Exception:
-        # Since these inserts happen sequentially and not in a
-        # single transaction upon failure we must undo the game
-        db.table("game").delete().eq("game_id", game_id).execute()
-        raise
-    return game
-
-""" GAME HELPERS """
+""" MATCHMAKING GAME HELPERS """
 
 def start_match(player_a: str, player_b: str, language: str) -> dict:
     """ Starts a match between two paired players from matchmaking. The turn order 
@@ -208,37 +181,13 @@ def start_match(player_a: str, player_b: str, language: str) -> dict:
          .delete()                          # FROM game
          .eq("game_id", game["game_id"])    # WHERE game_id = game_id
          .execute())
-        raise    
+        raise 
 
-# NOTE: this function is designed to be reused with
-def insert_game(player_id: str, language: str) -> dict:
-    """ Inserts a game into games table. Adds the player with turn order 1 to the
-        plays table. Player two needs to get added with join_second_player() """
+""" INVITE GAME HELPERS """
 
-    db = admin()
+# TODO: def create_game(player_id: str, language: str) -> dict:
 
-    game = rows(db.table("game")
-                .insert({"status": "waiting"})
-                .execute())[0]
-    game_id = game["game_id"] # game_id is generated randomly by Postgres with gen_random_uuid()
-
-    try:
-        word = pick_answer_word(language)
-        (db.table("answer")                                                         # INSERT INTO answer
-         .insert({"game_id": game_id, "word": word, "language": language})          # (game_id, word, langauge)
-         .execute())
-        (db.table("plays")                                                          # INSERT INTO plays
-         .insert({"game_id": game_id, "player_id": player_id, "turn_order": 1})     # (game_id, player_id, turn_order)
-         .execute())
-    except Exception:
-        # Since these inserts happen sequentially and not in a
-        # single transaction upon failure we must undo the game
-        (db.table("game")           # DELETE
-         .delete()                  # FROM game
-         .eq("game_id", game_id)    # WHERE game_id = game_id
-         .execute())
-        raise
-    return game
+# TODO: def join_game(game_id: str, player_id: str) -> dict:
 
 """ PLAYER TWO HELPERS """
 
@@ -267,103 +216,37 @@ def join_second_player(game_id: str, player_id: str) -> dict:
             raise GameNotFound(game_id) # Match was cancelled
     return updated[0]
 
-""" END PLAYERS TWO HELPERS """
+""" GAME HELPERS """   
 
+# NOTE: this function is designed to be reused for both invite and matchmaking games
+def insert_game(player_id: str, language: str) -> dict:
+    """ Inserts a game into games table. Adds the player with turn order 1 to the
+        plays table. Player two needs to get added with join_second_player() """
 
-def cancel_game(game_id: str, player_id: str) -> None:
-    """ Deletes a game that has status 'waiting' only the owner can cancel """
     db = admin()
 
-    game = get_game_row(game_id)
-    if game is None:
-        raise GameNotFound(game_id)
-
-    # Find the host of the game (player with turn = 1 for invite games)
-    host = rows(db.table("plays")       # SELECT player_id
-                .select("player_id")    # FROM plays
-                .eq("game_id", game_id) # WHERE game_id = game_id
-                .eq("turn_order", 1)    #   AND turn_order = 1
-                .execute())
-
-    if not host or host[0]["player_id"] != player_id:       # If the player_id does not match the host
-        raise GameForbidden(game_id)                        # then they do not have permission to cancel
-    if game["status"] != "waiting":                         # the game. Similarly, if the game has status
-        raise GameConflict("you cannot cancel this game")    # 'started' nobody has permission to cancel
-
-    deleted = rows(db.table("game")         # DELETE
-                   .delete()                # FROM game
-                   .eq("game_id", game_id)  # WHERE game_id = game_id
-                   .eq("status", "waiting") #   AND status = 'waiting'
-                   .execute())
-
-    if not deleted:                                         # If the game status is updated to 'started' between when we
-        raise GameConflict("game already in progress")      # checked permissions and took action then deletion will fail
-
-def has_open_game(player_id: str) -> bool:
-    """ A player may only be in one game at a time. Matchmaking opens a game.  """
-    plays = rows(admin().table("plays")         # SELECT game_id
-                 .select("game_id")             # FROM plays
-                 .eq("player_id", player_id)    # WHERE player_id == player_id
-                 .execute())
-    if not plays:
-        return False
-
-    open_games = rows(admin().table("game")                             # SELECT game_id
-                      .select("game_id")                                # FROM game
-                      .in_("game_id", [p["game_id"] for p in plays])    # WHERE game_id IN ( [p["game_id"] for p in plays])
-                      .in_("status", OPEN_STATUS)                       #   AND status IN ('waiting', 'in_progress')
-                      .limit(1)                                         # LIMIT 1
-                      .execute())
-    return len(open_games) > 0
-
-def get_game_row(game_id: str) -> dict | None:
-    res = admin().table("game").select("*").eq("game_id", game_id).execute()
-    data = rows(res)
-    return data[0] if data else None
-
-def is_player_in_game(game_id: str, player_id: str) -> bool:
-    """ Checks if player is in this specified game """
-    res = (admin().table("plays")       # SELECT player_id
-           .select("player_id")         # FROM plays
-           .eq("game_id", game_id)      # WHERE game_id == game_id
-           .eq("player_id", player_id)  #   AND player_id == player_id
-           .execute())
-    return len(rows(res)) > 0
-
-def join_game(game_id: str, player_id: str) -> dict:
-    """Adds second player to game with turn 2. Reuturns game row."""
-    db = admin()
-
-    game = get_game_row(game_id)
-    if game is None:
-        raise GameNotFound(game_id)
-    if game["status"] != "waiting":
-        raise GameConflict("This game is already in progress")  # The game has already been set to "started"
-    if is_player_in_game(game_id, player_id):
-        raise GameConflict("You are already in this game")
-    if has_open_game(player_id):
-        raise GameConflict("You cannot join two games") # XXX: This might create some ambiguity. Being in matchmaking opens
-                                                        # a game, but that might be unclear to the player a solution might
-                                                        # be to delay opening games until two players are paired. 
+    game = rows(db.table("game")
+                .insert({"status": "waiting"})
+                .execute())[0]
+    game_id = game["game_id"] # game_id is generated randomly by Postgres with gen_random_uuid()
 
     try:
-        db.table("plays").insert({"game_id": game_id, "player_id": player_id, "turn_order": 2}).execute()
-    except APIError as e:
-        if e.code == "23505": # unique_violation
-            raise GameConflict("This game is full") # The game has not yet been set to "started". Race case
+        word = pick_answer_word(language)
+        (db.table("answer")                                                         # INSERT INTO answer
+         .insert({"game_id": game_id, "word": word, "language": language})          # (game_id, word, langauge)
+         .execute())
+        (db.table("plays")                                                          # INSERT INTO plays
+         .insert({"game_id": game_id, "player_id": player_id, "turn_order": 1})     # (game_id, player_id, turn_order)
+         .execute())
+    except Exception:
+        # Since these inserts happen sequentially and not in a
+        # single transaction upon failure we must undo the game
+        (db.table("game")           # DELETE
+         .delete()                  # FROM game
+         .eq("game_id", game_id)    # WHERE game_id = game_id
+         .execute())
         raise
-    updated = rows(db.table("game")                 # UPDATE status -> 'started'
-                   .update({"status": "started"})   # FROM game
-                   .eq("game_id", game_id)          # WHERE game_id = game_id
-                   .eq("status", "waiting")         #   AND status = 'waiting'
-                   .execute())
-
-    if not updated:
-        # Game was cancelled while P2 joins
-        if get_game_row(game_id) is None:   # cancelled games are deleted
-            raise GameNotFound(game_id)
-        raise GameConflict("This game is in progress")
-    return updated[0]
+    return game
 
 def whose_turn(players: list[dict], guesses: list[dict]) -> str | None:
     """ P1 will always go first, then turns will alternate. """
@@ -423,3 +306,43 @@ def get_game_state(game_id: str, player_id: str) -> dict:
     if finished and answer:
         state["answer"] = answer[0]["word"]
     return state
+
+def cancel_game(game_id: str, player_id: str) -> None:
+    """ Deletes a game that has status 'waiting' only the owner can cancel """
+    db = admin()
+
+    game = get_game_row(game_id)
+    if game is None:
+        raise GameNotFound(game_id)
+
+    # Find the host of the game (player with turn = 1 for invite games)
+    host = rows(db.table("plays")       # SELECT player_id
+                .select("player_id")    # FROM plays
+                .eq("game_id", game_id) # WHERE game_id = game_id
+                .eq("turn_order", 1)    #   AND turn_order = 1
+                .execute())
+
+    if not host or host[0]["player_id"] != player_id:       # If the player_id does not match the host
+        raise GameForbidden(game_id)                        # then they do not have permission to cancel
+    if game["status"] != "waiting":                         # the game. Similarly, if the game has status
+        raise GameConflict("you cannot cancel this game")   # 'started' nobody has permission to cancel
+
+    deleted = rows(db.table("game")         # DELETE
+                   .delete()                # FROM game
+                   .eq("game_id", game_id)  # WHERE game_id = game_id
+                   .eq("status", "waiting") #   AND status = 'waiting'
+                   .execute())
+
+    if not deleted:                                         # If the game status is updated to 'started' between when we
+        raise GameConflict("game already in progress")      # checked permissions and took action then deletion will fail
+
+def get_game_row(game_id: str) -> dict | None:
+    """ Returns the game row data (game_id, status, created_at, ended_at), returns
+        none if no game row is found """
+
+    res = (admin().table("game")    # SELECT *
+           .select("*")             # FROM game
+           .eq("game_id", game_id)  # WHERE game_id = game_id
+           .execute())
+    data = rows(res)
+    return data[0] if data else None
