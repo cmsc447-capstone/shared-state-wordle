@@ -22,7 +22,7 @@ Upon success you can expect the following output. Please note that order of the 
     "game_id": "<uuid>",
     "status": "started",
     "created_at": "<timestamp>",
-    "ended_at" : null,
+    "ended_at" : "<timestamp>",
     "language": "<language>",
     "players": [
         {"player_id": "uuid",
