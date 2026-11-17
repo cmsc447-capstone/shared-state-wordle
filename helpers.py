@@ -205,7 +205,7 @@ def join_invite_game(game_id: str, player_id: str) -> dict:
 
     game = get_game_row(game_id)
     if game is None:
-        raise GameConflict(game_id) # Match was cancelled
+        raise GameNotFound(game_id) # Match was cancelled
     if game["status"] != "waiting":
         raise GameConflict("This game is already in progress")  # The game has already been set to 'started'
                                                                 # another player has already joined the game
