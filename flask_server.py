@@ -53,8 +53,6 @@ def join_matchmaking():
         game = helpers.match_player(g.user.id)
     except helpers.GameConflict as e:
         return jsonify({"error": str(e)}), 409
-    except ValueError as e: # no words in lang
-        return jsonify({"error": str(e)}), 400
 
     if game is None:
         return jsonify({"queued": True, "game_id": None}), 202
@@ -82,8 +80,6 @@ def create_invite():
 
     try:
         game = helpers.create_invite_game(g.user.id, language)
-    except ValueError as e: # When there are no words for a language
-        return jsonify({"error": str(e)}), 400
     except helpers.GameConflict as e:
         return jsonify({"error": str(e)}), 409
 
