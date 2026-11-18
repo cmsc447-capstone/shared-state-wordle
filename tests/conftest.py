@@ -22,7 +22,7 @@ PASSWORD = "password123"
 
 # This tests creates a new player with a random username and
 # returns their id, username, token, and request headers
-def _sign_up_test_player() -> dict:
+def _register_player() -> dict:
     client = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_PUBLISHABLE_KEY"])
     username = f"test_{uuid.uuid4().hex[:10]}"
     res = client.auth.sign_up({
@@ -30,6 +30,7 @@ def _sign_up_test_player() -> dict:
         "password": PASSWORD,
         "options": {"data": {"username": username}},
     })
+
     assert res.user is not None
     assert res.session is not None # Only works with enable_confirmations = false [config.toml]
 
@@ -43,40 +44,36 @@ def _sign_up_test_player() -> dict:
 
 # Test fails if supabase isn't up
 @pytest.fixture(scope="session", autouse=True)
-def supabase_is_running():
+def check_supabase():
     try:
         admin().table("language").select("language_code").limit(1).execute()
-    except Exception as e:
-        pytest.exit(f"Unable to reach local Supabase")
+    except Exception:
+        pytest.exit("Unable to reach local Supabase")
 
-# Flask test client can send requests to the app without running a server
+""" PYTEST TEST CLIENT FIXTURE . NO SERVER NEEDED """
+
 @pytest.fixture
 def client():
     flask_app.config["TESTING"] = True
     with flask_app.test_client() as c:
         yield c
 
+""" PYTEST PLAYER FIXTURES """
+
 @pytest.fixture
 def sofia():
-    return _sign_up_test_player()
+    return _register_player()
 
 @pytest.fixture
 def grace():
-    return _sign_up_test_player()
+    return _register_player()
 
 @pytest.fixture
 def julia():
-    return _sign_up_test_player()
+    return _register_player()
 
-@pytest.fixture
-def create_game(client):
-    def _create(player, language="eng"):
-        r = client.post("/games", json={"language": language}, headers=player["headers"])
-        assert r.status_code == 201, r.get_json()
-        return r.get_json()["game_id"]
-    return _create
+""" PYTESTS FIXTURES FOR DIRECT DATABASE ACCESS """
 
-# Direct database access for chechking what the routes wrote
 @pytest.fixture
 def db():
     return admin()

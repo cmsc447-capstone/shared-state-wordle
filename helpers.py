@@ -108,8 +108,8 @@ def join_queue(player_id: str, language: str, joined_at: str | None = None) -> N
         ticket["joined_at"] = joined_at
 
     try:
-        (admin().table("matchmaking_queue")     # INSERT INTO matchmaking_queue
-         .insert({"player_id": player_id, "language": language})           # (player_id, language)
+        (admin().table("matchmaking_queue") # INSERT INTO matchmaking_queue
+         .insert(ticket)                    # (player_id, language)
          .execute())
     except APIError as e:
         if e.code != "23505": # unique_violation: Insertion failed because player is already in queue
