@@ -107,7 +107,7 @@ def cancel_game(game_id):
     return jsonify(), 204
 
 # Request to join an invite game
-@app.route("/games/<uuid:game_id/join>", methods=["POST"])
+@app.route("/games/<uuid:game_id>/join", methods=["POST"])
 @require_user()
 def join_game(game_id):
     try:
