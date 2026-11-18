@@ -18,33 +18,33 @@ def clear_pool(db):
      .neq("player_id", FALSE_PLAYER_ID)
      .execute())
 
-def get_game_state(client, player, game_id):
+def c_get_game_state(client, player, game_id):
     r = client.get(f"/games/{game_id}", headers=player["headers"])
     assert r.status_code == 200, r.get_json()
-    return r.get_json()
+    return r
 
-def join_matchmake(client, player):
+def c_join_matchmake(client, player):
     r = client.post("/games/match", headers=player["headers"])
     assert r.status_code in (201, 202), r.get_json()
-    return r.get_json()
+    return r
 
-def leave_matchmake(client, player):
+def c_leave_matchmake(client, player):
     r = client.delete("/games/match", headers=player["headers"])
     assert r.status_code == 204, r.get_json()
 
-def create_invite_game(client, player):
+def c_create_invite_game(client, player):
     r = client.post("/games", headers=player["headers"])
     assert r.status_code == 201, r.get_json()
-    return r.get_json()
+    return r
 
-def cancel_invite_game(client, player):
+def c_cancel_invite_game(client, player):
     r = client.delete("/games", headers=player["headers"])
     assert r.status_code == 204, r.get_json()
 
-def join_invite_game(client, player, game_id):
+def c_join_invite_game(client, player, game_id):
     r = client.post(f"/games/{game_id}/join", headers=player["headers"])
     assert r.status_code == 200, r.get_json()
-    return r.get_json()
+    return r
 
 """ TEST HELPERS """
 
@@ -55,17 +55,77 @@ def _tickets(player_id, db, db_rows):
            .execute())
     return db_rows(res)
 
-# First player can enter queue
+def _inject_into_queue(player, db):
+    language = helpers.get_player_language(player["player_id"])
+    (db.table("matchmaking_queue")
+     .insert({"player_id": player["player_id"], "language": language})
+     .execute())
 
-# First player waits in queue
+def _get_queued(db, db_rows):
+    return [r["player_id"] for r in
+            db_rows(db.table("matchmaking_queue")
+                    .select("player_id")
+                    .order("joined_at")
+                    .execute())]
 
-# First player in queue returns status 202
+def _in_same_game(player_a, player_b):
+    game_a = helpers.get_open_game(player_a["player_id"])
+    game_b = helpers.get_open_game(player_b["player_id"])
 
-# First player in queue is written to matchmaking table
+    if game_a is not None and game_b is not None:
+        return game_a["game_id"] == game_b["game_id"]
+    return False
+
+""" MATCHMAKING ROUTES TEST """
+
+def test_first_player_in_queue(client, sofia):
+    r = c_join_matchmake(client, sofia)
+
+    assert r.get_json() == {"queued": True, "game_id": None}
+    assert helpers.in_queue(sofia["player_id"])
+
+def test_second_player_in_queue(client, sofia, julia):
+    first = c_join_matchmake(client, sofia)
+
+    assert first.status_code == 202
+    assert first.get_json() == {"queued": True, "game_id": None}
+
+    second = c_join_matchmake(client, julia)
+
+    julia_game = helpers.get_open_game(julia["player_id"])
+    sofia_game = helpers.get_open_game(sofia["player_id"])
+
+    assert julia_game is not None
+    assert sofia_game is not None
+
+    assert second.status_code == 201
+    assert second.get_json() == {"queued": False, "game_id": julia_game["game_id"]}
+
+    assert _in_same_game(sofia, julia)
+
+def test_thrid_player_in_queue(client, sofia, julia, grace, db, db_rows):
+    _inject_into_queue(sofia, db) # FIRST
+    _inject_into_queue(julia, db) # SECOND
+
+    assert _get_queued(db, db_rows) == [sofia["player_id"], julia["player_id"]]
+
+    r = c_join_matchmake(client, grace)
+    assert r.status_code == 201
+
+    assert _get_queued(db, db_rows) == [julia["player_id"]] # Only Julia waits
+
+    assert _in_same_game(sofia, grace)
+
+def test_lave 
+
+""" HELPER TESTS """
+# Helpers aren't completly tested here. The tests in this program
+# focus on testing the routes. Tests are preformed on the individual
+# helpers when creating the behaviour on the routes is too challenging
 
 def test_in_queue_helper(client, sofia):
     assert helpers.in_queue(sofia["player_id"]) == False
-    join_matchmake(client, sofia)
+    c_join_matchmake(client, sofia)
     assert helpers.in_queue(sofia["player_id"]) == True
 
 def test_join_queue_normal(sofia, db, db_rows):
@@ -92,8 +152,4 @@ def test_join_preserves_timestamp(sofia, db, db_rows):
 
     assert original == _tickets(sofia["player_id"], db, db_rows)[0]["joined_at"]
 
-def test_first_player_in_queue(client, sofia):
-    body = join_matchmake(client, sofia)
-
-    assert body == {"queued": True, "game_id": None}
-    assert helpers.in_queue(sofia["player_id"])
+    # TODO: RACE
