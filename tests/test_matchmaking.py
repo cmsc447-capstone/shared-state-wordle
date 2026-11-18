@@ -116,7 +116,48 @@ def test_thrid_player_in_queue(client, sofia, julia, grace, db, db_rows):
 
     assert _in_same_game(sofia, grace)
 
-def test_lave 
+def test_leave_queue_normal(client, sofia, db, db_rows):
+    c_join_matchmake(client, sofia)
+    c_leave_matchmake(client, sofia)
+
+    assert _get_queued(db, db_rows) == []
+
+def test_leave_queue_and_rejoin(client, sofia, db, db_rows):
+    c_join_matchmake(client, sofia)
+    c_leave_matchmake(client, sofia)
+    c_join_matchmake(client, sofia)
+
+    assert _get_queued(db, db_rows) == [sofia["player_id"]]
+
+def test_leave_and_rejoin_still_pairable(client, sofia, julia, db, db_rows):
+    _inject_into_queue(sofia, db)
+    _inject_into_queue(julia, db)
+    c_leave_matchmake(client, sofia)
+
+    assert _get_queued(db, db_rows) == [julia["player_id"]]
+
+    r = c_join_matchmake(client, sofia)
+    assert r.status_code == 201
+
+    assert _in_same_game(sofia, julia)
+
+def test_leave_queue_resets_timestamp(client, sofia, db, db_rows):
+    original = "2026-01-01T00:00:00+00:00"
+    helpers.join_queue(sofia["player_id"], "eng", original)
+
+    assert original == _tickets(sofia["player_id"], db, db_rows)[0]["joined_at"]
+
+    c_leave_matchmake(client, sofia)
+    c_join_matchmake(client, sofia)
+
+    assert _tickets(sofia["player_id"], db, db_rows)[0]["joined_at"] != original
+
+def test_leave_mm_safe_to_call_on_unqueued_players(client, sofia, db, db_rows):
+    assert _get_queued(db, db_rows) == []
+    c_leave_matchmake(client, sofia) # 204 checked in c_leave_matchmake
+    assert _get_queued(db, db_rows) == []
+
+""" INVITE ROUTES TEST """
 
 """ HELPER TESTS """
 # Helpers aren't completly tested here. The tests in this program
