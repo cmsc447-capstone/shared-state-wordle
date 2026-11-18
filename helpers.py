@@ -215,6 +215,35 @@ def join_invite_game(game_id: str, player_id: str) -> dict:
     release_player(player_id, join=game_id)         # Once checks pass release the to-be-p2 so they can join the invite game
     return join_second_player(game_id, player_id)   # Seat the second player
 
+def cancel_game(game_id: str, player_id: str) -> None:
+    """ Deletes a game that has status 'waiting' only the owner can cancel """
+    db = admin()
+
+    game = get_game_row(game_id)
+    if game is None:
+        raise GameNotFound(game_id)
+
+    # Find the host of the game (player with turn = 1 for invite games)
+    host = rows(db.table("plays")       # SELECT player_id
+                .select("player_id")    # FROM plays
+                .eq("game_id", game_id) # WHERE game_id = game_id
+                .eq("turn_order", 1)    #   AND turn_order = 1
+                .execute())
+
+    if not host or host[0]["player_id"] != player_id:       # If the player_id does not match the host
+        raise GameForbidden(game_id)                        # then they do not have permission to cancel
+    if game["status"] != "waiting":                         # the game. Similarly, if the game has status
+        raise GameConflict("you cannot cancel this game")   # 'started' nobody has permission to cancel
+
+    deleted = rows(db.table("game")         # DELETE
+                   .delete()                # FROM game
+                   .eq("game_id", game_id)  # WHERE game_id = game_id
+                   .eq("status", "waiting") #   AND status = 'waiting'
+                   .execute())
+
+    if not deleted:                                         # If the game status is updated to 'started' between when we
+        raise GameConflict("game already in progress")      # checked permissions and took action then deletion will fail
+
 """ PLAYER TWO HELPERS """
 
 def join_second_player(game_id: str, player_id: str) -> dict:
@@ -282,35 +311,6 @@ def insert_game(player_id: str, language: str) -> dict:
          .execute())
         raise
     return game
-
-def cancel_game(game_id: str, player_id: str) -> None:
-    """ Deletes a game that has status 'waiting' only the owner can cancel """
-    db = admin()
-
-    game = get_game_row(game_id)
-    if game is None:
-        raise GameNotFound(game_id)
-
-    # Find the host of the game (player with turn = 1 for invite games)
-    host = rows(db.table("plays")       # SELECT player_id
-                .select("player_id")    # FROM plays
-                .eq("game_id", game_id) # WHERE game_id = game_id
-                .eq("turn_order", 1)    #   AND turn_order = 1
-                .execute())
-
-    if not host or host[0]["player_id"] != player_id:       # If the player_id does not match the host
-        raise GameForbidden(game_id)                        # then they do not have permission to cancel
-    if game["status"] != "waiting":                         # the game. Similarly, if the game has status
-        raise GameConflict("you cannot cancel this game")   # 'started' nobody has permission to cancel
-
-    deleted = rows(db.table("game")         # DELETE
-                   .delete()                # FROM game
-                   .eq("game_id", game_id)  # WHERE game_id = game_id
-                   .eq("status", "waiting") #   AND status = 'waiting'
-                   .execute())
-
-    if not deleted:                                         # If the game status is updated to 'started' between when we
-        raise GameConflict("game already in progress")      # checked permissions and took action then deletion will fail
 
 def whose_turn(players: list[dict], guesses: list[dict]) -> str | None:
     """ P1 will always go first, then turns will alternate. """
