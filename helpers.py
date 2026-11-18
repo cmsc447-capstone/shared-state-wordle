@@ -20,6 +20,9 @@ class GameForbidden(Exception):
 class PlayerNotFound(Exception):
     """No player found with for that ID"""
 
+class NoWordsAvailable(Exception):
+    """No words exist in the word table for that language"""
+
 """ WORD HELPERS """
 
 def pick_answer_word(language: str) -> str:
@@ -29,7 +32,7 @@ def pick_answer_word(language: str) -> str:
     count_res = (admin().table("word").select("word", count=CountMethod.exact).eq("language", language).limit(1).execute())
     total = count_res.count or 0
     if total == 0:
-        raise ValueError(f"There are no words available in '{language}'")
+        raise NoWordsAvailable(f"There are no words available in '{language}'")
 
     # Fetch a word at a random position using bounds from total
     offset = random.randrange(total)
@@ -41,7 +44,7 @@ def pick_answer_word(language: str) -> str:
            .execute())
     data = rows(res)
     if not data:
-        raise ValueError(f"There are no words available in '{language}'")
+        raise NoWordsAvailable(f"There are no words available in '{language}'")
     return data[0]["word"]
 
 """ PLAYER HELPERS """
