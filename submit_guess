@@ -1,21 +1,32 @@
 @app.route("/games/guess", methods=["POST"])
-@require_user()
 def submit_guess():
-    body = request.get_json(silent=True) or {}
-    word = (body.get("guess") or "").strip().lower()
-    if not word:
-        return jsonify({"error": "guess is required"}), 400
+    user_id = session.get("user_id")
+    if user_id is None:
+        return jsonify({"message": "Not logged in"}), 401
 
-    try:
-        game_id = helpers.find_active_game(g.user.id)
-        result = helpers.submit_guess(game_id, g.user.id, word)
-    except helpers.GameNotFound:
-        return jsonify({"error": "No active game found"}), 404
-    except helpers.GameForbidden:
-        return jsonify({"error": "You did not play in this game"}), 403
-    except helpers.GameConflict as e:
-        return jsonify({"error": str(e)}), 409
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+    data = request.get_json(silent=True) or {}
+    guess = (data.get("guess") or "").strip().lower()
+    if not guess:
+        return jsonify({"message": "Guess is required"}), 400
 
-    return jsonify(result), 201
+    game = helpers.find_active_game(user_id)
+    if game is None:
+        return jsonify({"message": "No active game found"}), 404
+
+    target = helpers.get_target_word(game["game_id"])
+    if target is None:
+        return jsonify({"message": "Game has no answer"}), 500
+
+    # Team B evaluates the guess against the target word
+    result = helpers.evaluate_guess(guess, target)
+    if not result["valid"]:
+        return jsonify({"message": result["message"]}), 400
+
+    row = helpers.insert_guess(game["game_id"], user_id, guess, result["feedback"])
+
+    return jsonify({
+        "game_id": row["game_id"],
+        "guess": row["word"],
+        "feedback": row["feedback"],
+        "attempt_num": row["attempt_num"],
+    }), 201
