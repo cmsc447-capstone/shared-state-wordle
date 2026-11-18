@@ -89,7 +89,7 @@ def create_invite():
                     }), 201
 
 # Request to cancel an invite game
-@app.route("/games", methods=["DELETE"])
+@app.route("/games/<uuid:game_id>", methods=["DELETE"])
 @require_user()
 def cancel_game(game_id):
     try:
