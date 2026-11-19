@@ -194,13 +194,21 @@ def match_player(player_id: str) -> dict | None:
 
 """ INVITE GAME HELPERS """
 
-def create_invite_game(player_id: str, language: str) -> dict:
-    """ Create an invite game. The host of the game is removed from matchmaking. """
+def create_invite_game(player_id: str) -> dict:
+    """ Creates and invite game in the host's langauge. The host is removed from
+        matchmaking. Returns the game rows with langauge attached """
+
+    language = get_player_language(player_id) # None if no player found
+    if language is None:
+        raise PlayerNotFound(player_id)
 
     if get_open_game(player_id) is not None:
         raise GameConflict("You are already in a game")
     leave_queue(player_id) # Removes hosts from queue. Safe to call even if host isn't in queue
-    return insert_game(player_id, language)
+
+    game = insert_game(player_id, language)
+    game["language"] = language
+    return game
 
 def join_invite_game(game_id: str, player_id: str) -> dict:
     """ Join and invite game as P2. If the player who is accepting this invite was

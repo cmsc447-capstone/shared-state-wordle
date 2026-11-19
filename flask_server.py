@@ -51,6 +51,8 @@ def get_game_state(game_id):
 def join_matchmaking():
     try:
         game = helpers.match_player(g.user.id)
+    except helpers.PlayerNotFound:
+        return jsonify({"error": "No player found for this account"}), 404
     except helpers.GameConflict as e:
         return jsonify({"error": str(e)}), 409
 
@@ -71,21 +73,16 @@ def leave_matchmaking():
 @app.route("/games", methods=["POST"])
 @require_user()
 def create_invite():
-    language = helpers.get_player_language(g.user.id)
-
-    # NOTE: None does not mean no language was found, players always are required
-    # to have a language preference set. None is returned when no player is found
-    if language is None:
-        return jsonify({"error": "No player found for this account"}), 404
-
     try:
-        game = helpers.create_invite_game(g.user.id, language)
+        game = helpers.create_invite_game(g.user.id)
+    except helpers.PlayerNotFound:
+        return jsonify({"error": "No player found for this account"}), 404
     except helpers.GameConflict as e:
         return jsonify({"error": str(e)}), 409
 
     return jsonify({"game_id": game["game_id"],
                     "status": game["status"],
-                    "language": language,
+                    "language": game["language"],
                     }), 201
 
 # Request to cancel an invite game
