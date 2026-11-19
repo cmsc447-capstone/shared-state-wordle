@@ -250,10 +250,10 @@ def cancel_game(game_id: str, player_id: str) -> None:
                 .eq("turn_order", 1)    #   AND turn_order = 1
                 .execute())
 
-    if not host or host[0]["player_id"] != player_id:       # If the player_id does not match the host
-        raise GameForbidden(game_id)                        # then they do not have permission to cancel
-    if game["status"] != "waiting":                         # the game. Similarly, if the game has status
-        raise GameConflict("you cannot cancel this game")   # 'started' nobody has permission to cancel
+    if not host or host[0]["player_id"] != player_id:           # If the player_id does not match the host
+        raise GameForbidden(game_id)                            # then they do not have permission to cancel
+    if game["status"] != "waiting":                             # the game. Similarly, if the game has status
+        raise GameConflict("Unable to cancel an active game")   # 'started' nobody has permission to cancel
 
     deleted = rows(db.table("game")         # DELETE
                    .delete()                # FROM game
@@ -261,8 +261,8 @@ def cancel_game(game_id: str, player_id: str) -> None:
                    .eq("status", "waiting") #   AND status = 'waiting'
                    .execute())
 
-    if not deleted:                                         # If the game status is updated to 'started' between when we
-        raise GameConflict("game already in progress")      # checked permissions and took action then deletion will fail
+    if not deleted:                                             # If the game status is updated to 'started' between when we
+        raise GameConflict("Unable to cancel an active game")   # checked permissions and took action then deletion will fail
 
 """ PLAYER TWO HELPERS """
 

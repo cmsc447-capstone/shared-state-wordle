@@ -50,7 +50,7 @@ def get_game_state(game_id):
     try:
         state = helpers.get_game_state(str(game_id), g.user.id)
     except helpers.GameNotFound:
-        return jsonify({"error": "No game found with that game_id"}), 404
+        return jsonify({"error": "Game not found"}), 404
     except helpers.GameForbidden:
         return jsonify({"error": "You did not play in this game"}), 403
     return jsonify(state), 200
@@ -110,7 +110,7 @@ def cancel_game(game_id):
     try:
         helpers.cancel_game(str(game_id), g.user.id)
     except helpers.GameNotFound:
-        return jsonify({"error": "No game found with that game_id"}), 404
+        return jsonify({"error": "Game not fonud"}), 404
     except helpers.GameForbidden:
         return jsonify({"error": "Only the host can canel this game"}), 403
     except helpers.GameConflict as e:
@@ -124,7 +124,7 @@ def join_game(game_id):
     try:
         game = helpers.join_invite_game(str(game_id), g.user.id)
     except helpers.GameNotFound:
-        return jsonify({"error": "No game found with that game_id"}), 404
+        return jsonify({"error": "Game not found"}), 404
     except helpers.GameConflict as e:
         return jsonify({"error": str(e)}), 409
 
