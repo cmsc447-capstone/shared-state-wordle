@@ -49,7 +49,7 @@
 ---
 ---
 
-## Matchmaking Routes
+## Matchmaking
 
 ### POST /games/match
 
@@ -89,7 +89,7 @@ Status code is *always* 204. This makes it safe to call when when not in matchma
 ---
 ---
 
-## Invite Routes
+## Invites
 
 ### POST /games
 
@@ -150,6 +150,36 @@ Status code 201. Game was created.
 | 409  | `{"error": "You are already in this game"}` | Player attempted to join their own game.
 | 409  | `{"error": "This game is full"}` | Player attempted to join accept the invite but another player joined before their transaction was complete. 
 | 409  | `{"error": "You are already in a game"}` | Player attempted to join while in an active game.
+
+---
+---
+
+## User login
+
+### POST /users/login
+
+**Logs in an *existing* user**. If the credentials are valid, the server returns the user's information and Supabase authentication tokens.
+
+The `access_token` is used to authenticate subsequent API requests through the `Authorization: Bearer <access_token>` header. The `refresh_token` is used to obtain a new access token when the current one expires. `expires_at` indicates when the access token expires. The `user_id` identifies the authenticated user. The `username` identifies the user within the application.
+
+
+Status code 201. Successful login
+
+
+```json
+{
+    "user_id": "<user_id>",
+    "username": "<username>",
+    "access_token": "<access_token>",
+    "refresh_token": "<refresh_token>",
+    "expires_at": "<expiration_timestamp>"
+}
+```
+
+#### **Error Codes**
+| CODE | JSON  | MEANING |
+| ---- | ----- | ------- |
+| 401 | `{"error": "Invalid email or password"}` | If the email or password is incorrect |
 
 ---
 ---
