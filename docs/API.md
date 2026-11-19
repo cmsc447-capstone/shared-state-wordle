@@ -1,18 +1,11 @@
 # Shared State-Wordle API
 
-## Endpoints
+## Game State
 
 ### GET /games/\<game_id\>
 
-Returns the current state of a game. It is **only** available to players who have participated the game.
+**Retrieve game state**. The game state can be retrieved at any point only by the games participants. The answer is only returned when the game is finished. `ended_at`, `players`, `guesses`, and `current_turn` changes through game progression. 
 
-| STATUS | BODY          | WHEN |
-| ------ | ------------- | ---- |
-| 200    | **SEE BELOW** | On success |
-| 403    | `{"error": "You did not play in this game"}` | If an unauthorized user is attempting to get the game state.
-| 404    | `{"error": "No game found with that game_id"}` | If the game_id is not listed in the database.
-
-The following output is what you can expect to recieve on successful calls. Please note that the order of the keys might not match exactly as described/
 
 ```json
 {
@@ -45,3 +38,118 @@ The following output is what you can expect to recieve on successful calls. Plea
     "answer": "<answer>"
 }
 ```
+
+#### **Errors**
+| CODE | JSON          | MEANING |
+| ---- | ------------- | ---- |
+| 200  | **SEE BELOW** | On success |
+| 403  | `{"error": "You did not play in this game"}` | If an unauthorized user is attempting to get the game state.
+| 404 | `{"error": "No game found with that game_id"}` | If the game_id is not listed in the database.
+
+---
+---
+
+## Matchmaking Routes
+
+### POST /games/match
+
+**Join matchmaking.** A player is only allowed to join matchmaking if they are not already in an active game. If the route is called twice, a 202 is returned and the player *will* keep their place in line. 
+
+
+Status code 201. Player was match immediately.
+```json
+{
+    "queued": False,
+    "game_id": <game_id>
+}
+```
+---
+
+Status code 202. Enqueued, no match was available.
+```json
+{
+    "queued": True,
+    "game_id": None
+}
+```
+
+#### **Errors**
+| CODE | JSON  | MEANING |
+| ---- | ----- | ------- |
+| 409  | `{"error": "You are already in a game"}` | Player tried to queue while in an active game
+
+---
+
+### DELETE /games/match
+
+**Exit matchmaking**. A player leaves matchmaking and is dequeued. A player is automatically removed from matchmaking if, they are matched with another player in the matchmaking pool and create or accept a game invite.
+
+Status code is *always* 204. This makes it safe to call when when not in matchmaking.
+
+---
+---
+
+## Invite Routes
+
+### POST /games
+
+**Create invite**. A player is allowed to create a game invite only if they are not already in an active game. 
+
+Status code 201. Game was created.
+
+```json
+{
+    "game_id": <game_id>,
+    "game_status": "waiting",
+    "language": <language>
+}
+```
+
+#### **Errors**
+| CODE | JSON  | MEANING |
+| ---- | ----- | ------- |
+| 409  | `{"error": "You are already in a game"}` | Player tried to create invite while in an active game.
+
+---
+
+### DELETE /games/\<uuid:game_id\>
+
+**Cancel invite**. Only the host is allowed to cancel an invite. An invite can only be cancelled if the game is not active. Outgoing invites are automatically cancelled when a player joins matchmaking or attempts to accept a _**different**_ invite.
+
+Successful status code is 204.
+
+#### **Error Codes**
+| CODE | JSON  | MEANING |
+| ---- | ----- | ------- |
+| 403  | `{"error": "Only the host can canel this game"}` | Player attempted to cancel a game they were not the host for.
+| 404  | `{"error": "No game found with that game_id}` | Player attempted to cancel a game that did not exist.
+| 409  | `{"error": "you cannot cancel this game"}` | Player attempted to cancel a game that was in progress.
+| 409  | `{"error": "game already in progress"}` | Player attempted to cancel a game but the guest joined during the transaction.
+
+---
+
+### POST /games/\<uuid:game_id\>/join
+
+An invite can only be accepted if the recipient is not currently in an active game. A player is only allowed to accept an invite that they did not create.  
+
+Status code 201. Game was created.
+
+```json
+{
+    "game_id": <game_id>,
+    "game_status": "started",
+    "turn_order": 2
+}
+```
+
+#### **Error Codes**
+| CODE | JSON  | MEANING |
+| ---- | ----- | ------- |
+| 404  | `{"error": "No game found with that game_id"}` | Player attempted to join a game that does not exist.
+| 409  | `{"error": "This game is already in progress"}` | Player attempted to join an active game.
+| 409  | `{"error": "You are already in this game"}` | Player attempted to join their own game.
+| 409  | `{"error": "This game is full"}` | Player attempted to join accept the invite but another player joined before their transaction was complete. 
+| 409  | `{"error": "You are already in a game"}` | Player attempted to join while in an active game.
+
+---
+---
