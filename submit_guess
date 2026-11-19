@@ -4,28 +4,28 @@ def submit_guess():
     # Must be logged in; the user id comes from the login session
     user_id = session.get("user_id")
     if user_id is None:
-        return jsonify({"message": "Not logged in"}), 401
+        return jsonify({"error": "Not logged in"}), 401
 
     # Read the guess from the request body and clean it up
     data = request.get_json(silent=True) or {}
     guess = (data.get("guess") or "").strip().lower()
     if not guess:
-        return jsonify({"message": "Guess is required"}), 400
+        return jsonify({"error": "Guess is required"}), 400
 
     # Find the game this user is in (the client never sends a game_id)
     game = helpers.find_active_game(user_id)
     if game is None:
-        return jsonify({"message": "No active game found"}), 404
+        return jsonify({"error": "No active game found"}), 404
 
     # Get the secret word for that game
     target = helpers.get_target_word(game["game_id"])
     if target is None:
-        return jsonify({"message": "Game has no answer"}), 500
+        return jsonify({"error": "Game has no answer"}), 500
 
     # Team B evaluates the guess against the target word
     result = helpers.evaluate_guess(guess, target)
     if not result["valid"]:
-        return jsonify({"message": result["message"]}), 400
+        return jsonify({"error": result["message"]}), 400
 
     # Valid guess: save it and return the result to the frontend
     row = helpers.insert_guess(game["game_id"], user_id, guess, result["feedback"])
