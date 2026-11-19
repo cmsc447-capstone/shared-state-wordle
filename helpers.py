@@ -192,11 +192,23 @@ def match_player(player_id: str) -> dict | None:
         join_queue(opponent["player_id"], opponent["language"], opponent["joined_at"]) 
         raise
 
+def matchmaking_status(player_id: str) -> dict:
+    """ Players in queue wait for a match to be found. If a player is still in the
+        queue, they comtinue to wait. """
+
+    if in_queue(player_id):
+        return {"queued": True, "game_id": None}
+    
+    game = get_open_game(player_id)
+    if game is not None and game["status"] == "started":
+        return {"queued": False, "game_id": game["game_id"]}
+    return {"queued": False, "game_id": None}
+
 """ INVITE GAME HELPERS """
 
 def create_invite_game(player_id: str) -> dict:
-    """ Creates and invite game in the host's langauge. The host is removed from
-        matchmaking. Returns the game rows with langauge attached """
+    """ Creates an invite game in the host's langauge. The host is removed from
+        matchmaking. Returns the game row with langauge attached """
 
     language = get_player_language(player_id) # None if no player found
     if language is None:

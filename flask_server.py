@@ -67,6 +67,12 @@ def leave_matchmaking():
     helpers.leave_queue(g.user.id)
     return jsonify(), 204 # Always returns the same result where or not player was queued
 
+# Request to check in on matchmaking status.
+@app.route("/games/match", methods={"GET"})
+@require_user()
+def get_matchmaking_status():
+    return jsonify(helpers.matchmaking_status(g.user.id)), 200
+
 """ INVITE ROUTES """
 
 # Request to create an invite game
