@@ -2,7 +2,11 @@
 import random
 from postgrest.types import CountMethod
 from postgrest.exceptions import APIError
-from db import admin, rows
+
+import random
+from db import admin, rows, auth_client
+from postgrest.types import CountMethod
+from postgrest.exceptions import APIError
 
 OPEN_STATUS = ["waiting", "started"] # anything but finished
 
@@ -390,14 +394,13 @@ def get_game_state(game_id: str, player_id: str) -> dict:
     if finished:
         state["answer"] = answer[0]["word"]
     return state
-from db import admin, auth_client 
-supabase = admin()
 
-def verify_user(username: str, password: str) -> dict[str, str] | None:
+def verify_user(username: str, password: str) -> dict | None:
+
+    db = admin()
     # Find the user's email using their username
     response = (
-        supabase
-        .table("player")
+        db.table("player")
         .select("player_id, username")
         .eq("username", username)
         .maybe_single()
@@ -425,10 +428,9 @@ def verify_user(username: str, password: str) -> dict[str, str] | None:
         })
     except Exception:
         return None
-
-    if auth_response.user is None:
+    if auth_response.user is None or auth_response.session is None:
         return None
-
+    
     return {
         "user_id": auth_response.user.id,
         "username": db_username,

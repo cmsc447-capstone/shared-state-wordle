@@ -1,12 +1,12 @@
 # CMSC 447 - Shared-State Wordle
 # Created: 10/11/26
 
-# Imports
-from flask import Flask, jsonify, g
-import helpers
+import os
+from flask import Flask, jsonify, request, g
 from werkzeug.exceptions import HTTPException
 from auth import require_user
-import os
+import helpers
+
 # IMPORT GAME CLASS
 # IMPORT PLAYER/USER CLASS
 # IMPORT GUESS CLASS
