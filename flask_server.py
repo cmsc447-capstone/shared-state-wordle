@@ -6,6 +6,7 @@ from flask import Flask, jsonify, g
 import helpers
 from werkzeug.exceptions import HTTPException
 from auth import require_user
+import os
 # IMPORT GAME CLASS
 # IMPORT PLAYER/USER CLASS
 # IMPORT GUESS CLASS
@@ -17,14 +18,25 @@ app = Flask(__name__)
 @app.errorhandler(HTTPException)
 def handle_http_error(e):
     return jsonify({"error": e.name}), e.code
-
-""" USER ROUTES """
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 # Request to create account
 # TODO: @app.route("/users", methods=["POST"])
 
 # Request to login
-# TODO: @app.route("/users/login", methods=["POST"])
+@app.route("/users/login", methods=["POST"])
+def login():
+    data = request.get_json()
+
+    username = data.get("username")
+    password = data.get("password")
+
+    user = helpers.verify_user(username, password)
+
+    if user is None:
+        return jsonify({"error": "Invalid username or password"}), 401
+
+    return jsonify(user), 200
 
 # Request to get user's history
 # TODO: @app.route("/users/<username>/history", methods=["POST"])
