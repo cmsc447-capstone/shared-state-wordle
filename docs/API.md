@@ -30,7 +30,7 @@
         {"attempt_num": 1,
          "player_id": "<uuid>",
          "word": "<guess>",
-         "feedback": "",            // Please check with feedback team
+         "feedback": "",
          "made_at": "<timestamp>"
         }
     ],
@@ -44,7 +44,7 @@
 | ---- | ------------- | ---- |
 | 200  | **SEE BELOW** | On success |
 | 403  | `{"error": "You did not play in this game"}` | If an unauthorized user is attempting to get the game state.
-| 404 | `{"error": "No game found with that game_id"}` | If the game_id is not listed in the database.
+| 404 | `{"error": "Game not fonud"}` | Game was not found.
 
 ---
 ---
@@ -76,7 +76,8 @@ Status code 202. Enqueued, no match was available.
 #### **Errors**
 | CODE | JSON  | MEANING |
 | ---- | ----- | ------- |
-| 409  | `{"error": "You are already in a game"}` | Player tried to queue while in an active game
+| 404  | `{"error": "No player found for this account"}` | Player account not found.
+| 409  | `{"error": "You are already in a game"}` | Player tried to queue while in an active game.
 
 ---
 
@@ -108,7 +109,21 @@ Status code 201. Game was created.
 #### **Errors**
 | CODE | JSON  | MEANING |
 | ---- | ----- | ------- |
+| 404  | `{"error": "No player found for this account"}` | Player account not found.
 | 409  | `{"error": "You are already in a game"}` | Player tried to create invite while in an active game.
+
+---
+
+### GET /games/match
+
+**Check status of matchmaking**. When players aren't instantly queued they should continuously poll this route. Which will response with either of the following. 
+
+### **Errors**
+| CODE | JSON  | MEANING |
+| ---- | ----- | ------- |
+| 200  | `{"queued": True, "game_id": None}` | Player is still waiting in queue.
+| 200  | `"queued": False, "game_id": game_id}` | Player was matched.
+| 200  | `{"queued": False, "game_id": None}` | Player is no longer in queue. |
 
 ---
 
@@ -122,9 +137,9 @@ Successful status code is 204.
 | CODE | JSON  | MEANING |
 | ---- | ----- | ------- |
 | 403  | `{"error": "Only the host can canel this game"}` | Player attempted to cancel a game they were not the host for.
-| 404  | `{"error": "No game found with that game_id}` | Player attempted to cancel a game that did not exist.
-| 409  | `{"error": "you cannot cancel this game"}` | Player attempted to cancel a game that was in progress.
-| 409  | `{"error": "game already in progress"}` | Player attempted to cancel a game but the guest joined during the transaction.
+| 404  | `{"error": "Game not fonud}` | Player attempted to cancel a game that did not exist.
+| 409  | `{"error": "Unable to cancel an active game"}` | Player attempted to cancel a game that was in progress.
+| 409  | `{"error": "Unable to cancel an active game"}` | Player attempted to cancel a game but the guest joined during the transaction.
 
 ---
 
@@ -145,7 +160,7 @@ Status code 201. Game was created.
 #### **Error Codes**
 | CODE | JSON  | MEANING |
 | ---- | ----- | ------- |
-| 404  | `{"error": "No game found with that game_id"}` | Player attempted to join a game that does not exist.
+| 404  | `{"error": "Game not fonud"}` | Player attempted to join a game that does not exist.
 | 409  | `{"error": "This game is already in progress"}` | Player attempted to join an active game.
 | 409  | `{"error": "You are already in this game"}` | Player attempted to join their own game.
 | 409  | `{"error": "This game is full"}` | Player attempted to join accept the invite but another player joined before their transaction was complete. 
@@ -179,7 +194,7 @@ Status code 201. Successful login
 #### **Error Codes**
 | CODE | JSON  | MEANING |
 | ---- | ----- | ------- |
-| 401 | `{"error": "Invalid email or password"}` | If the email or password is incorrect |
+| 401 | `{"error": "Invalid email or password"}` | If the email or password is incorrect. |
 
 ---
 ---
