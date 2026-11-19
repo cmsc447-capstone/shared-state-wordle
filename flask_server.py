@@ -28,7 +28,7 @@ def login():
     user = helpers.verify_user(username, password)
 
     if user is None:
-        return jsonify({"message": "Invalid username or password"}), 401
+        return jsonify({"error": "Invalid username or password"}), 401
 
     return jsonify(user), 200
 

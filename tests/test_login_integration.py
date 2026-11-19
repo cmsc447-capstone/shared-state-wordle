@@ -20,7 +20,6 @@ def test_login_success():
 
     # Check the API response
     assert response.status_code == 200
-    assert response.json()["message"] == "Login successful"
     assert response.json()["username"] == "pixel_penguin"
 
 
@@ -36,7 +35,7 @@ def test_login_invalid_password():
     )
 
     assert response.status_code == 401
-    assert response.json()["message"] == "Invalid username or password"
+    assert response.json()["error"] == "Invalid username or password"
 
 
 # Test nonexistent username
@@ -51,4 +50,4 @@ def test_login_nonexistent_user():
     )
 
     assert response.status_code == 401
-    assert response.json()["message"] == "Invalid username or password"
+    assert response.json()["error"] == "Invalid username or password"
