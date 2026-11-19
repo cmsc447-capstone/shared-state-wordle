@@ -34,16 +34,14 @@ def c_leave_matchmake(client, player):
 
 def c_create_invite_game(client, player):
     r = client.post("/games", headers=player["headers"])
-    assert r.status_code == 201, r.get_json()
     return r
 
-def c_cancel_invite_game(client, player):
-    r = client.delete("/games", headers=player["headers"])
+def c_cancel_invite_game(client, player, game_id):
+    r = client.delete(f"/games/{game_id}", headers=player["headers"])
     assert r.status_code == 204, r.get_json()
 
 def c_join_invite_game(client, player, game_id):
     r = client.post(f"/games/{game_id}/join", headers=player["headers"])
-    assert r.status_code == 200, r.get_json()
     return r
 
 """ TEST HELPERS """
@@ -75,6 +73,29 @@ def _in_same_game(player_a, player_b):
     if game_a is not None and game_b is not None:
         return game_a["game_id"] == game_b["game_id"]
     return False
+
+def _get_open(player):
+    game = helpers.get_open_game(player["player_id"])
+
+    if game is not None:
+        return game["game_id"]
+    return FALSE_GAME_ID
+
+def _create_and_join(client, player_a, player_b):
+    c_create_invite_game(client, player_a)
+    game_id = _get_open(player_a)
+    c_join_invite_game(client, player_b, game_id)
+    return game_id
+
+def _queue_and_pair(client, player_a, player_b):
+    c_join_matchmake(client, player_a)
+    c_join_matchmake(client, player_b)
+    assert _in_same_game(player_a, player_b)
+    game = helpers.get_open_game(player_a["player_id"])
+
+    if game is not None:
+        return game["game_id"]
+    return FALSE_GAME_ID
 
 """ MATCHMAKING ROUTES TEST """
 
@@ -158,6 +179,149 @@ def test_leave_mm_safe_to_call_on_unqueued_players(client, sofia, db, db_rows):
     assert _get_queued(db, db_rows) == []
 
 """ INVITE ROUTES TEST """
+
+def test_create_invite_game(client, sofia):
+    assert _get_open(sofia) == FALSE_GAME_ID
+    c_create_invite_game(client, sofia)
+
+    invite = _get_open(sofia)
+    assert invite != FALSE_GAME_ID
+
+def test_cancel_invite_game(client, sofia):
+    c_create_invite_game(client, sofia)
+    game_id = _get_open(sofia)
+    c_cancel_invite_game(client, sofia, game_id)
+    assert _get_open(sofia) == FALSE_GAME_ID
+
+def test_join_invite_game(client, sofia, grace):
+    c_create_invite_game(client, sofia)
+    game_id = _get_open(sofia)
+    c_join_invite_game(client, grace, game_id)
+
+    assert _in_same_game(sofia, grace)
+
+def test_create_two_invtes(client, sofia):
+    first = c_create_invite_game(client, sofia)
+    assert first.status_code == 201
+    game_id = _get_open(sofia)
+
+    second  = c_create_invite_game(client, sofia)
+    assert second.status_code == 409
+
+    assert game_id == _get_open(sofia)
+
+def test_create_invite_leaves_mm(client, sofia, db, db_rows):
+    c_join_matchmake(client, sofia)
+    assert _get_queued(db, db_rows) == [sofia["player_id"]]
+
+    r = c_create_invite_game(client, sofia)
+    assert r.status_code == 201
+
+    assert _get_queued(db, db_rows) == []
+
+def test_create_invite_after_leaving_mm_is_joinable(client, sofia, julia):
+    c_join_matchmake(client, sofia)
+    c_create_invite_game(client, sofia)
+    game_id = _get_open(sofia)
+    c_join_invite_game(client, julia, game_id)
+
+    assert _in_same_game(sofia, julia)
+
+def test_invite_unjoinable_when_entering_mm(client, sofia, julia):
+    c_create_invite_game(client, sofia)
+    game_id = _get_open(sofia)
+    c_join_matchmake(client, sofia)
+
+    r = c_join_invite_game(client, julia, game_id)
+    assert r.status_code == 404
+    assert _in_same_game(sofia, julia) == False
+
+def test_cancel_invite_as_non_host(client, sofia, julia):
+    c_create_invite_game(client, sofia)
+    game_id = _get_open(sofia)
+
+    r = client.delete(f"/games/{game_id}", headers=julia["headers"])
+    assert r.status_code == 403
+
+def test_cannot_cancel_started_invite_game(client, sofia, julia):
+    game_id = _create_and_join(client, sofia, julia)
+
+    s = client.delete(f"/games/{game_id}", headers=julia["headers"])
+    assert s.status_code == 403
+
+    j = client.delete(f"/games/{game_id}", headers=sofia["headers"])
+    assert j.status_code == 409
+
+    assert _get_open(sofia) == game_id
+
+def test_two_players_accept_invite(client, sofia, julia, grace):
+    c_create_invite_game(client, sofia)
+    game_id = _get_open(sofia)
+
+    first = c_join_invite_game(client, julia, game_id)
+    assert first.status_code == 200
+
+    second = c_join_invite_game(client, grace, game_id)
+    assert second.status_code == 409
+
+    assert _in_same_game(sofia, julia)
+    assert _in_same_game(sofia, grace) == False
+
+def test_cannot_join_mm_with_started_invite_game(client, sofia, julia):
+    _create_and_join(client, sofia, julia)
+
+    assert _in_same_game(sofia, julia)
+
+    s = client.post("/games/match", headers=sofia["headers"])
+    assert s.status_code == 409
+    j = client.post("/games/match", headers=julia["headers"])
+    assert j.status_code == 409
+
+def test_cannot_join_mm_with_started_mm_game(client, sofia, julia):
+    _queue_and_pair(client, sofia, julia)
+
+    s = client.post("/games/match", headers=sofia["headers"])
+    assert s.status_code == 409
+    j = client.post("/games/match", headers=julia["headers"])
+    assert j.status_code == 409
+
+def test_cannot_accept_invite_with_started_invite_game(client, sofia, julia, grace):
+    _create_and_join(client, sofia, julia)
+    c_create_invite_game(client, grace)
+    game_id = _get_open(grace)
+
+    s = client.post(f"/games/{game_id}/join", headers=sofia["headers"])
+    assert s.status_code == 409
+    j = client.post(f"/games/{game_id}/join", headers=julia["headers"])
+    assert j.status_code == 409
+
+def test_cannot_accept_invite_with_started_mm_game(client, sofia, julia, grace):
+    _queue_and_pair(client, sofia, julia)
+    c_create_invite_game(client, grace)
+    game_id = _get_open(grace)
+
+    s = client.post(f"/games/{game_id}/join", headers=sofia["headers"])
+    assert s.status_code == 409
+    j = client.post(f"/games/{game_id}/join", headers=julia["headers"])
+    assert j.status_code == 409
+
+def test_cannot_create_invite_with_started_mm_game(client, sofia, julia):
+    _queue_and_pair(client, sofia, julia)
+
+    s = client.post("/games", headers=sofia["headers"])
+    j = client.post("/games", headers=julia["headers"])
+
+    assert s.status_code == 409
+    assert j.status_code == 409
+
+def test_cannot_create_invite_with_started_invite_game(client, sofia, julia):
+    _create_and_join(client, sofia, julia)
+
+    s = client.post("/games", headers=sofia["headers"])
+    j = client.post("/games", headers=julia["headers"])
+
+    assert s.status_code == 409
+    assert j.status_code == 409
 
 """ HELPER TESTS """
 # Helpers aren't completly tested here. The tests in this program
