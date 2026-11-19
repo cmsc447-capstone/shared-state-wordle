@@ -3,7 +3,7 @@
 
 
 # Imports
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify
 import helpers
 import os
 # IMPORT GAME CLASS
@@ -30,14 +30,7 @@ def login():
     if user is None:
         return jsonify({"message": "Invalid username or password"}), 401
 
-    # Store user information in the session
-    session["user_id"] = user["user_id"]
-    session["username"] = user["username"]
-
-    return jsonify({
-        "message": "Login successful",
-        "username": user["username"]
-    }), 200
+    return jsonify(user), 200
 
 # Request to get user's history
 # TODO: @app.route("/users/<username>/history", methods=["POST"])
