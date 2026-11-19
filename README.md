@@ -1,12 +1,16 @@
-# Shared state Worldle
+# Shared State Worldle - API
 
-## Contributors
+### Contributors
 
 Miguel Leon\
 Abrha Kesetebrhan\
 Jacob Emde\
 Kamalakar Reddy
 
-## Grader
+### Grader
 
 Gaurav Sharma
+
+## Summary
+
+## Server Host
