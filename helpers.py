@@ -43,4 +43,7 @@ def verify_user(username: str, password: str) -> dict[str, str] | None:
     return {
         "user_id": auth_response.user.id,
         "username": db_username,
+        "access_token": auth_response.session.access_token,
+        "refresh_token": auth_response.session.refresh_token,
+        "expires_at": auth_response.session.expires_at
     }
