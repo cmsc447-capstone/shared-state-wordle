@@ -24,7 +24,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: 2.122.0
+          version: 2.122.0 # Do not use version 3+
 
       - name: Start local supabase
         run: supabase start
@@ -37,21 +37,8 @@ jobs:
      
       - name: Start Flask server
         run: |
-            nohup flask --app flask_server run --host 127.0.0.1 --port 5000 > flask.log 2>&1 &
-            for i in $(seq 1 30); do
-              if curl -s -o /dev/null http://127.0.0.1:5000; then
-                echo "Flask is up"
-                exit 0
-              fi
-              sleep 1
-            done
-            echo "Flask did not start"
-            cat flask.log
-            exit 1
+            flask --app flask_server run --port 5000 > flask.log 2>&1 &
+            curl -so /dev/null --retry 30 --retry-delay 1 --retry-connrefused http://127.0.0.1:5000
 
       - name: Run tests
         run: pytest -v
-
-      - name: Show Flask log
-        if: failure()
-        run: cat flask.log
