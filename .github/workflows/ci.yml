@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [flask-server]
+  pull_request:
+    branches: [flask-server]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+
+      - name: Start local supabase
+        run: supabase start
+
+      - name: Export Supabase env vars
+        run: |
+          echo "SUPABASE_URL=$(supabase status -o env | grep '^API_URL' | cut -d= -f2- | tr -d '\"')" >> $GITHUB_ENV
+          echo "SUPABASE_SECRET_KEY=$(supabase status -o env | grep '^SECRET_KEY' | cut -d= -f2- | tr -d '\"')" >> $GITHUB_ENV
+
+      - name: Run tests
+        run: pytest -v
+        env:
+          FLASK_SECRET_KEY: ci-test-secret
