@@ -130,7 +130,7 @@ def test_route_missing_guess(client):
     login_as(client, str(uuid.uuid4()))
     r = client.post("/games/guess", json={})
     assert r.status_code == 400
-    assert r.get_json() == {"message": "Guess is required"}
+    assert r.get_json() == {"error": "Guess is required"}
 
 
 # 404: logged in but not in any active game
@@ -138,7 +138,7 @@ def test_route_no_active_game(client):
     login_as(client, str(uuid.uuid4()))
     r = client.post("/games/guess", json={"guess": "stone"})
     assert r.status_code == 404
-    assert r.get_json() == {"message": "No active game found"}
+    assert r.get_json() == {"error": "No active game found"}
 
 
 # 500: the game exists but has no answer row (should not happen normally)
@@ -147,7 +147,7 @@ def test_route_game_has_no_answer(client, sb, seeded_game):
     login_as(client, seeded_game["alice"])
     r = client.post("/games/guess", json={"guess": "stone"})
     assert r.status_code == 500
-    assert r.get_json() == {"message": "Game has no answer"}
+    assert r.get_json() == {"error": "Game has no answer"}
 
 
 # 400: Team B says the guess is invalid. We fake Team B's answer here,
@@ -155,12 +155,12 @@ def test_route_game_has_no_answer(client, sb, seeded_game):
 def test_route_invalid_guess_from_team_b(client, sb, seeded_game, monkeypatch):
     monkeypatch.setattr(
         helpers, "evaluate_guess",
-        lambda guess, target: {"valid": False, "message": "Not a valid word"},
+        lambda guess, target: {"valid": False, "error": "Not a valid word"},
     )
     login_as(client, seeded_game["alice"])
     r = client.post("/games/guess", json={"guess": "zzzzz"})
     assert r.status_code == 400
-    assert r.get_json() == {"message": "Not a valid word"}
+    assert r.get_json() == {"error": "Not a valid word"}
 
     rows = sb.table("guess").select("*").eq("game_id", seeded_game["game_id"]).execute().data
     assert rows == []   # nothing stored for an invalid guess
