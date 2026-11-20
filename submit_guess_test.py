@@ -122,7 +122,7 @@ def test_attempt_num_increments(seeded_game):
 def test_route_not_logged_in(client):
     r = client.post("/games/guess", json={"guess": "stone"})
     assert r.status_code == 401
-    assert r.get_json() == {"message": "Not logged in"}
+    assert r.get_json() == {"error": "Not logged in"}
 
 
 # 400: logged in but no guess in the request
