@@ -155,7 +155,7 @@ def test_route_game_has_no_answer(client, sb, seeded_game):
 def test_route_invalid_guess_from_team_b(client, sb, seeded_game, monkeypatch):
     monkeypatch.setattr(
         helpers, "evaluate_guess",
-        lambda guess, target: {"valid": False, "error": "Not a valid word"},
+        lambda guess, target: {"valid": False, "message": "Not a valid word"},
     )
     login_as(client, seeded_game["alice"])
     r = client.post("/games/guess", json={"guess": "zzzzz"})
