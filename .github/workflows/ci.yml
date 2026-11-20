@@ -1,4 +1,4 @@
-name: CI
+name: CI tests
 
 on:
   push:
@@ -13,24 +13,31 @@ jobs:
       FLASK_SECRET_KEY: ci-test-secret
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
+
       - name: Install dependencies
         run: pip install -r requirements.txt pytest
+
       - uses: supabase/setup-cli@v1
         with:
           version: 2.122.0
+
       - name: Start local supabase
         run: supabase start
-      - name: Export Supabase env vars
+
+      - name: Extract Supabase Environment Variables
         run: |
           echo "SUPABASE_URL=$(supabase status -o env | grep '^API_URL' | cut -d= -f2- | tr -d '\"')" >> $GITHUB_ENV
           echo "SUPABASE_SECRET_KEY=$(supabase status -o env | grep '^SECRET_KEY' | cut -d= -f2- | tr -d '\"')" >> $GITHUB_ENV
+          echo "SUPABASE_PUBLISHABLE_KEY=$(supabase status -o env | grep '^PUBLISHABLE_KEY' | cut -d= -f2- | tr -d '\"')" >> $GITHUB_ENV
+     
       - name: Start Flask server
-        - run: |
-            nohup flask --app flask_server run --host 127.0.0.1 --port 500 > flask.log 2>&1 &
+        run: |
+            nohup flask --app flask_server run --host 127.0.0.1 --port 5000 > flask.log 2>&1 &
             for i in $(seq 1 30); do
               if curl -s -o /dev/null http://127.0.0.1:5000; then
                 echo "Flask is up"
@@ -41,8 +48,10 @@ jobs:
             echo "Flask did not start"
             cat flask.log
             exit 1
+
       - name: Run tests
         run: pytest -v
+
       - name: Show Flask log
         if: failure()
         run: cat flask.log
