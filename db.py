@@ -6,6 +6,10 @@ load_dotenv()   # Ensure you have correct values in .env file
 
 _admin: Client | None = None # No client created at import time
 
+# Return the rows from a postgrest response, never None
+def rows(resp) -> list[dict]:
+    return resp.data or []
+
 # Singleton. First call builds a client from URL and secret key.
 # Subsequent calls are handed back the same client. This enables
 # a single client for the whole server, one connection for every
