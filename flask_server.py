@@ -28,13 +28,13 @@ def create_account():
     # --- Validate input ---
     if not USERNAME_RE.match(username):
         return jsonify({
-            "message": "Username must be 3-20 characters: letters, numbers, underscores"
+            "error": "Username must be 3-20 characters: letters, numbers, underscores"
         }), 400
     if not EMAIL_RE.match(email):
-        return jsonify({"message": "A valid email is required"}), 400
+        return jsonify({"error": "A valid email is required"}), 400
     if len(password) < MIN_PASSWORD_LENGTH:
         return jsonify({
-            "message": f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
+            "error": f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
         }), 400
 
     supabase = admin()
@@ -49,10 +49,10 @@ def create_account():
             .execute()
         )
     except Exception:
-        return jsonify({"message": "Database error"}), 500
+        return jsonify({"error": "Database error"}), 500
 
     if existing.data:
-        return jsonify({"message": "Username already taken"}), 409
+        return jsonify({"error": "Username already taken"}), 409
 
     # --- Step 1: create the Auth user (Supabase hashes the password) ---
     try:
@@ -63,12 +63,12 @@ def create_account():
         })
     except AuthApiError as e:
         if e.code == "email_exists":
-            return jsonify({"message": "Email already registered"}), 409
+            return jsonify({"error": "Email already registered"}), 409
         if e.code == "weak_password":
-            return jsonify({"message": "Password is too weak"}), 400
-        return jsonify({"message": "Account creation failed"}), 500
+            return jsonify({"error": "Password is too weak"}), 400
+        return jsonify({"error": "Account creation failed"}), 500
     except Exception:
-        return jsonify({"message": "Account creation failed"}), 500
+        return jsonify({"error": "Account creation failed"}), 500
 
     user_id = str(auth_result.user.id)
 
@@ -88,13 +88,13 @@ def create_account():
 
         code = getattr(e, "code", None)
         if code == "23505":    # unique_violation: someone grabbed the username first
-            return jsonify({"message": "Username already taken"}), 409
+            return jsonify({"error": "Username already taken"}), 409
         if code == "23503":    # foreign_key_violation: bad language code
-            return jsonify({"message": "Unknown language code"}), 400
-        return jsonify({"message": "Account creation failed"}), 500
+            return jsonify({"error": "Unknown language code"}), 400
+        return jsonify({"error": "Account creation failed"}), 500
 
     return jsonify({
-        "message": "Account created",
+        "error": "Account created",
         "player_id": user_id,
         "username": username,
     }), 201
