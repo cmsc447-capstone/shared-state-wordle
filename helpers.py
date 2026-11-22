@@ -396,6 +396,10 @@ def get_game_state(game_id: str, player_id: str) -> dict:
     return state
 
 def verify_user(username: str, password: str) -> dict | None:
+    """ Verifies a user's username and password using Supabase Auth.
+        Returns user information and session tokens if authentication succeeds.
+        Returns None if verification fails.
+    """
 
     db = admin()
     # Find the user's email using their username
