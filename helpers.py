@@ -64,6 +64,32 @@ def get_player_language(player_id: str) -> str | None:
     data = rows(res)
     return data[0]["language"] if data else None
 
+def language_exists(lang_code: str) -> bool:
+    """ Checks whether a language exists in the language table. """
+
+    response = (
+        admin()
+        .table("language")
+        .select("language_code")
+        .eq("language_code", lang_code)
+        .execute()
+    )
+
+    return bool(rows(response))
+
+def update_player_language(player_id: str, lang_code: str) -> bool:
+    """ Updates a player's preferred language. Returns whether the update succeeded. """
+
+    response = (
+        admin()
+        .table("player")
+        .update({"language": lang_code})
+        .eq("player_id", player_id)
+        .execute()
+    )
+
+    return bool(rows(response))
+
 def get_open_game(player_id: str) -> dict | None:
     """ Returns that game_id and status if a player is in an unfinished game and
         return None if player has no unfinished games (games_status in OPEN_STATUS)"""
