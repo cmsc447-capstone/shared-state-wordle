@@ -4,6 +4,8 @@
 
 ### GET /games/\<game_id\>
 
+By: Miguel
+
 **Retrieve game state**. The game state can be retrieved at any point only by the games participants. The answer is only returned when the game is finished. `ended_at`, `players`, `guesses`, and `current_turn` changes through game progression. 
 
 
@@ -53,6 +55,8 @@
 
 ### POST /games/match
 
+By: Miguel
+
 **Join matchmaking.** A player is only allowed to join matchmaking if they are not already in an active game. If the route is called twice, a 202 is returned and the player *will* keep their place in line. 
 
 
@@ -83,6 +87,8 @@ Status code 202. Enqueued, no match was available.
 
 ### DELETE /games/match
 
+By: Miguel
+
 **Exit matchmaking**. A player leaves matchmaking and is dequeued. A player is automatically removed from matchmaking if, they are matched with another player in the matchmaking pool and create or accept a game invite.
 
 Status code is *always* 204. This makes it safe to call when when not in matchmaking.
@@ -93,6 +99,8 @@ Status code is *always* 204. This makes it safe to call when when not in matchma
 ## Invites
 
 ### POST /games
+
+By: Miguel
 
 **Create invite**. A player is allowed to create a game invite only if they are not already in an active game. 
 
@@ -116,6 +124,8 @@ Status code 201. Game was created.
 
 ### GET /games/match
 
+By: Miguel
+
 **Check status of matchmaking**. When players aren't instantly queued they should continuously poll this route. Which will response with either of the following. 
 
 ### **Errors**
@@ -128,6 +138,8 @@ Status code 201. Game was created.
 ---
 
 ### DELETE /games/\<uuid:game_id\>
+
+By: Miguel
 
 **Cancel invite**. Only the host is allowed to cancel an invite. An invite can only be cancelled if the game is not active. Outgoing invites are automatically cancelled when a player joins matchmaking or attempts to accept a _**different**_ invite.
 
@@ -144,6 +156,8 @@ Successful status code is 204.
 ---
 
 ### POST /games/\<uuid:game_id\>/join
+
+By: Miguel
 
 An invite can only be accepted if the recipient is not currently in an active game. A player is only allowed to accept an invite that they did not create.  
 
@@ -172,6 +186,8 @@ Status code 201. Game was created.
 ## User login
 
 ### POST /users/login
+
+By: Kamalakar
 
 **Logs in an *existing* user**. If the credentials are valid, the server returns the user's information and Supabase authentication tokens.
 
