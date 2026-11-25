@@ -285,16 +285,16 @@ def join_second_player(game_id: str, player_id: str) -> dict:
 
 """ GAME HELPERS """ 
 
-def start_match(player_a: str, player_b: str, language: str, game_type: str) -> dict:
+def start_match(first: str, second: str, language: str, game_type: str) -> dict:
     """ Starts a match betweeb two players that are paired. The turn order of the
         players is decided by the function who called this one. player_a -> 1, and
         player_b -> 2. The game is set to 'started once the second player has been
         seated """
 
-    game = insert_game(player_a, language, game_type)
+    game = insert_game(first, language, game_type)
 
     try:
-        return join_second_player(game["game_id"], player_b)
+        return join_second_player(game["game_id"], second)
     except Exception: # If joining a second player fails 
         (admin().table("game")              # DELETE
          .delete()                          # FROM game
