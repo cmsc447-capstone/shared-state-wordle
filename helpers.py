@@ -31,7 +31,7 @@ class NoWordsAvailable(Exception):
 
 """ WORD HELPERS """
 
-def pick_answer_word(language: str) -> str:
+def pick_random_word(language: str) -> str:
     """ Returns a randomly selected for from the word table for language """
 
     # Total number of words in a language
@@ -326,7 +326,7 @@ def insert_game(player_id: str, language: str, game_type: str) -> dict:
     game_id = game["game_id"] # game_id is generated randomly by Postgres with gen_random_uuid()
 
     try:
-        word = pick_answer_word(language)
+        word = pick_random_word(language)
         (db.table("answer")                                                         # INSERT INTO answer
          .insert({"game_id": game_id, "word": word, "language": language})          # (game_id, word, langauge)
          .execute())
