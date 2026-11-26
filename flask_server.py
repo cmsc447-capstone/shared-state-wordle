@@ -110,9 +110,9 @@ def cancel_game(game_id):
     try:
         helpers.cancel_game(str(game_id), g.user.id)
     except helpers.GameNotFound:
-        return jsonify({"error": "Game not fonud"}), 404
+        return jsonify({"error": "Game not found"}), 404
     except helpers.GameForbidden:
-        return jsonify({"error": "Only the host can canel this game"}), 403
+        return jsonify({"error": "Only the host can cancel this game"}), 403
     except helpers.GameConflict as e:
         return jsonify({"error": str(e)}), 409
     return jsonify(), 204
