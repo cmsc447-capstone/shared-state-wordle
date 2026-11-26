@@ -103,7 +103,7 @@ def create_invite():
                     "language": game["language"],
                     }), 201
 
-# Request to cancel an invite game
+# Request to cancel and invite game, and forefit a computer game
 @app.route("/games/<uuid:game_id>", methods=["DELETE"])
 @require_user()
 def cancel_game(game_id):
@@ -132,6 +132,14 @@ def join_game(game_id):
                     "status": game["status"],
                     "turn_order": 2,
                     }), 200
+
+""" COMPUTER PLAYER ROUTES """
+
+# Request to play against computer
+#@app.route("/games/computer", methods=["POST"])
+#@require_user()
+#def computer_game():
+
 
 """ GAMEPLAY ROUTES """
 
