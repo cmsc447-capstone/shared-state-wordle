@@ -8,9 +8,14 @@ from db import admin, rows, auth_client
 from postgrest.types import CountMethod
 from postgrest.exceptions import APIError
 
+# A single CPU identity exists for all games
+CPU_ID              = "00000000-0000-0000-0000-000000000001"
+CPU_NAME            = "Computer"
+
 OPEN_STATUS         = ["waiting", "started"] # anything but finished
 GAME_TYPE_MATCH     = "match"
 GAME_TYPE_INVITE    = "invite"
+GAME_TYPE_CPU       = "bot"
 
 """ ERRORS """
 
@@ -256,6 +261,18 @@ def cancel_game(game_id: str, player_id: str) -> None:
 
     if not deleted:                                             # If the game status is updated to 'started' between when we
         raise GameConflict("Unable to cancel an active game")   # checked permissions and took action then deletion will fail
+
+""" COMPUTER HELPERS """
+
+def get_game_language(game_id: str) -> str:
+    """ Returns the language of a game. Allows the bot to know which
+        language dictionary it should choose from. """
+
+    lang = rows(admin().table("answer")
+               .select("language")
+               .eq("game_id", game_id)
+               .execute())
+    return lang[0]["language"] 
 
 """ PLAYER TWO HELPERS """
 
