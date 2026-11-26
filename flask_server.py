@@ -136,7 +136,33 @@ def join_game(game_id):
 """ GAMEPLAY ROUTES """
 
 # Request to submit a guess
-# TODO: @app.route("/games/<game_id>/guess", methods=["POST"])
+@app.route("/games/guess", methods=["POST"])
+@require_user()
+def submit_guess():
+    data = request.get_json(silent=True) or {}
+    guess = (data.get("guess") or "").strip().lower()
+    
+    if not guess:
+        return jsonify({"error": "Guess is required"}), 400
+
+    game = helpers.find_active_game(g.user.id)
+    if game is None:
+        return jsonify({"error": "No active game found"}), 404
+
+    target = helpers.get_target_word(game["game_id"])
+
+    result = helpers.evaluate_guess(guess, target)
+    if not result["valid"]:
+        return jsonify({"error": result["message"]}), 400
+
+    row = helpers.insert_guess(game["game_id"], g.user.id, guess, result["feedback"])
+
+    return jsonify({
+        "game_id": row["game_id"],
+        "guess": row["word"],
+        "feedback": row["feedback"],
+        "attempt_num": row["attempt_num"],
+    }), 201
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -442,3 +442,41 @@ def verify_user(username: str, password: str) -> dict | None:
         "refresh_token": auth_response.session.refresh_token,
         "expires_at": auth_response.session.expires_at
     }
+
+""" GUESS HELPERS """
+
+def find_active_game(player_id: str) -> dict | None:
+    res = (admin().table("plays")
+           .select("game!inner(game_id, status)")
+           .eq("player_id", player_id)
+           .eq("game.status", "started")
+           .limit(1)
+           .execute())
+    data = rows(res)
+    return data[0]["game"] if data else None
+
+def get_target_word(game_id: str) -> str | None:
+    res = admin().table("answer").select("word").eq("game_id", game_id).execute()
+    data = rows(res)
+    return data[0]["word"] if data else None
+
+def insert_guess(game_id: str, player_id: str, word: str, feedback: str) -> dict:
+    prior = admin().table("guess").select("attempt_num").eq("game_id", game_id).execute().data
+    attempt_num = len(prior) + 1
+    language = admin().table("answer").select("language").eq("game_id", game_id).execute().data[0]["language"]
+    return admin().table("guess").insert({
+        "game_id": game_id,
+        "attempt_num": attempt_num,
+        "player_id": player_id,
+        "word": word,
+        "language": language,
+        "feedback": feedback,
+    }).execute().data[0]
+
+def evaluate_guess(guess: str, target: str) -> dict:
+    """ TEMPORARY STUB until Team B's module is in. Returns
+        {"valid": True, "feedback": "GBBBG"} or {"valid": False, "message": "..."} """
+    if len(guess) != 5 or not guess.isalpha():
+        return {"valid": False, "message": "Guess must be a 5-letter word"}
+    feedback = "".join("G" if g == t else "B" for g, t in zip(guess, target))
+    return {"valid": True, "feedback": feedback}
