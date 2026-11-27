@@ -7,6 +7,7 @@ import random
 from db import admin, rows, auth_client
 from postgrest.types import CountMethod
 from postgrest.exceptions import APIError
+from uuid import UUID, uuid4
 
 OPEN_STATUS = ["waiting", "started"] # anything but finished
 
@@ -77,7 +78,7 @@ def language_exists(lang_code: str) -> bool:
 
     return bool(rows(response))
 
-def update_player_language(player_id: str, lang_code: str) -> bool:
+def update_player_language(player_id: UUID, lang_code: str) -> bool:
     """ Updates a player's preferred language. Returns whether the update succeeded. """
 
     response = (

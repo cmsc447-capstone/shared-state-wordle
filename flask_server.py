@@ -53,10 +53,10 @@ def config_lang():
     lang_code = data["lang_code"]
     player_id = g.user["id"]
 
-    if not language_exists(lang_code):
+    if not helpers.language_exists(lang_code):
         return jsonify({"error": "Invalid language code"}), 400
 
-    if not update_player_language(player_id, lang_code):
+    if not helpers.update_player_language(player_id, lang_code):
         return jsonify({"error": "Failed to update language"}), 500
 
     return jsonify({"lang_code": lang_code}), 200
