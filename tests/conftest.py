@@ -81,3 +81,24 @@ def db():
 @pytest.fixture
 def db_rows():
     return rows
+""" GAME FIXTURE FOR SUBMIT GUESS """
+
+@pytest.fixture
+def seeded_game(db, sofia, grace):
+    gid = str(uuid.uuid4())
+    
+    db.table("word").upsert([
+        {"word": "stone", "language": "eng"},
+        {"word": "apple", "language": "eng"},
+    ]).execute()
+    
+    db.table("game").insert({"game_id": gid, "status": "started"}).execute()
+    db.table("answer").insert({"game_id": gid, "word": "apple", "language": "eng"}).execute()
+    db.table("plays").insert([
+        {"player_id": sofia["player_id"], "game_id": gid, "turn_order": 1},
+        {"player_id": grace["player_id"], "game_id": gid, "turn_order": 2},
+    ]).execute()
+    
+    yield gid
+    
+    db.table("game").delete().eq("game_id", gid).execute()
