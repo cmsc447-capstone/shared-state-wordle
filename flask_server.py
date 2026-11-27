@@ -41,6 +41,26 @@ def login():
 # Request to get user's history
 # TODO: @app.route("/users/<username>/history", methods=["POST"])
 
+# Request to change user language preference
+@app.route("/users/edit/language", methods=["POST"])
+@require_user()
+def config_lang():
+    data = request.get_json()
+
+    if not data or "lang_code" not in data:
+        return jsonify({"error": "Missing language code"}), 400
+
+    lang_code = data["lang_code"]
+    player_id = g.user.id
+
+    if not helpers.language_exists(lang_code):
+        return jsonify({"error": "Invalid language code"}), 400
+
+    if not helpers.update_player_language(player_id, lang_code):
+        return jsonify({"error": "Failed to update language"}), 500
+
+    return jsonify({"lang_code": lang_code}), 200
+
 """ GAME MANAGEMENT ROUTES """
 
 # Request to get a game's state

@@ -7,6 +7,7 @@ import random
 from db import admin, rows, auth_client
 from postgrest.types import CountMethod
 from postgrest.exceptions import APIError
+from uuid import UUID, uuid4
 
 OPEN_STATUS         = ["waiting", "started"] # anything but finished
 GAME_TYPE_MATCH     = "match"
@@ -65,6 +66,32 @@ def get_player_language(player_id: str) -> str | None:
            .execute())
     data = rows(res)
     return data[0]["language"] if data else None
+
+def language_exists(lang_code: str) -> bool:
+    """ Checks whether a language exists in the language table. """
+
+    response = (
+        admin()
+        .table("language")
+        .select("language_code")
+        .eq("language_code", lang_code)
+        .execute()
+    )
+
+    return bool(rows(response))
+
+def update_player_language(player_id: UUID, lang_code: str) -> bool:
+    """ Updates a player's preferred language. Returns whether the update succeeded. """
+
+    response = (
+        admin()
+        .table("player")
+        .update({"language": lang_code})
+        .eq("player_id", player_id)
+        .execute()
+    )
+
+    return bool(rows(response))
 
 def get_open_game(player_id: str) -> dict | None:
     """ Returns that game_id and status if a player is in an unfinished game and
