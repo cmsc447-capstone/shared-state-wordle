@@ -51,7 +51,7 @@ def config_lang():
         return jsonify({"error": "Missing language code"}), 400
 
     lang_code = data["lang_code"]
-    player_id = g.user["id"]
+    player_id = g.user.id
 
     if not helpers.language_exists(lang_code):
         return jsonify({"error": "Invalid language code"}), 400
