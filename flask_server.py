@@ -47,19 +47,17 @@ def login():
 def config_lang():
     data = request.get_json()
 
-    if not data or "lang_code" not in data:
+    # Check that the JSON recieved is structured as expected
+    if not isinstance(data, dict) or not isinstance(data.get("lang_code"), str): 
         return jsonify({"error": "Missing language code"}), 400
-
-    lang_code = data["lang_code"]
-    player_id = g.user.id
-
-    if not helpers.language_exists(lang_code):
+    
+    try:
+        helpers.update_player_language(g.user.id, data["lang_code"])
+    except helpers.LanguageInvalid:
         return jsonify({"error": "Invalid language code"}), 400
-
-    if not helpers.update_player_language(player_id, lang_code):
-        return jsonify({"error": "Failed to update language"}), 500
-
-    return jsonify({"lang_code": lang_code}), 200
+    except helpers.PlayerNotFound:
+        return jsonify({"error": "No player found for this account"}), 404
+    return jsonify({"lang_code": data["lang_code"]}), 200
 
 """ GAME MANAGEMENT ROUTES """
 
