@@ -8,7 +8,9 @@ from db import admin, rows, auth_client
 from postgrest.types import CountMethod
 from postgrest.exceptions import APIError
 
-OPEN_STATUS = ["waiting", "started"] # anything but finished
+OPEN_STATUS         = ["waiting", "started"] # anything but finished
+GAME_TYPE_MATCH     = "match"
+GAME_TYPE_INVITE    = "invite"
 
 """ ERRORS """
 
@@ -68,11 +70,11 @@ def get_open_game(player_id: str) -> dict | None:
     """ Returns that game_id and status if a player is in an unfinished game and
         return None if player has no unfinished games (games_status in OPEN_STATUS)"""
 
-    res = (admin().table("plays")                   # SELECT g.game_id, g.status
-           .select("game!inner(game_id, status)")   # FROM plays AS p JOIN game AS g ON g.game_id = p.game_id
-           .eq("player_id", player_id)              # WHERE p.player_id = player_id
-           .in_("game.status", OPEN_STATUS)         #   AND g.status IN ('waiting', 'started')
-           .limit(1)                                # LIMIT 1
+    res = (admin().table("plays")                               # SELECT g.game_id, g.status, g.game_type
+           .select("game!inner(game_id, status, game_type)")    # FROM plays AS p JOIN game AS g ON g.game_id = p.game_id
+           .eq("player_id", player_id)                          # WHERE p.player_id = player_id
+           .in_("game.status", OPEN_STATUS)                     #   AND g.status IN ('waiting', 'started')
+           .limit(1)                                            # LIMIT 1
            .execute())
     data = rows(res)
     return data[0]["game"] if data else None
@@ -134,22 +136,6 @@ def leave_queue(player_id: str) -> None:
 
 """ MATCHMAKING GAME HELPERS """
 
-def start_mm_match(player_a: str, player_b: str, language: str) -> dict:
-    """ Starts a match between two paired players from matchmaking. The turn order 
-        is randomly assined. Eventually, starts game once second player is seated """
-
-    p1, p2 = random.sample([player_a, player_b], 2)
-    game = insert_game(p1, language)
-
-    try:
-        return join_second_player(game["game_id"], p2)
-    except Exception: # If joining a second player fails 
-        (admin().table("game")              # DELETE
-         .delete()                          # FROM game
-         .eq("game_id", game["game_id"])    # WHERE game_id = game_id
-         .execute())
-        raise
-
 def find_opponent(player_id: str, language: str) -> dict | None:
     """ Finds and assigns an opponet, decided by who has been waiting the the queue 
         the longest """
@@ -190,8 +176,11 @@ def match_player(player_id: str) -> dict | None:
         join_queue(player_id, language)
         return None
 
+    # Randomly assign player turn order
+    first, second = random.sample([player_id, opponent["player_id"]], 2)
+
     try:
-        return start_mm_match(player_id, opponent["player_id"], language)
+        return start_match(first, second, language, GAME_TYPE_MATCH)
     except Exception:
         join_queue(opponent["player_id"], opponent["language"], opponent["joined_at"]) 
         raise
@@ -222,7 +211,7 @@ def create_invite_game(player_id: str) -> dict:
         raise GameConflict("You are already in a game")
     leave_queue(player_id) # Removes hosts from queue. Safe to call even if host isn't in queue
 
-    game = insert_game(player_id, language)
+    game = insert_game(player_id, language, GAME_TYPE_INVITE)
     game["language"] = language
     return game
 
@@ -296,9 +285,26 @@ def join_second_player(game_id: str, player_id: str) -> dict:
 
 """ GAME HELPERS """ 
 
+def start_match(first: str, second: str, language: str, game_type: str) -> dict:
+    """ Starts a match betweeb two players that are paired. The turn order of the
+        players is decided by the function who called this one. player_a -> 1, and
+        player_b -> 2. The game is set to 'started once the second player has been
+        seated """
+
+    game = insert_game(first, language, game_type)
+
+    try:
+        return join_second_player(game["game_id"], second)
+    except Exception: # If joining a second player fails 
+        (admin().table("game")              # DELETE
+         .delete()                          # FROM game
+         .eq("game_id", game["game_id"])    # WHERE game_id = game_id
+         .execute())
+        raise
+
 def get_game_row(game_id: str) -> dict | None:
-    """ Returns the game row data (game_id, status, created_at, ended_at), returns
-        none if no game row is found """
+    """ Returns the game row data (game_id, status, created_at, ended_at, game_type)
+        , returns none if no game row is found """
 
     res = (admin().table("game")    # SELECT *
            .select("*")             # FROM game
@@ -307,14 +313,15 @@ def get_game_row(game_id: str) -> dict | None:
     data = rows(res)
     return data[0] if data else None
 
-def insert_game(player_id: str, language: str) -> dict:
-    """ Inserts a game into games table. Adds the player with turn order 1 to the
-        plays table. Player two needs to get added with join_second_player() """
+def insert_game(player_id: str, language: str, game_type: str) -> dict:
+    """ Inserts a game into game table. Adds the player with turn order 1 to the
+        plays table. Player two gets added with join_second_player(). game_type
+        describes the type of game: match, invite, bot"""
 
     db = admin()
 
     game = rows(db.table("game")
-                .insert({"status": "waiting"})
+                .insert({"status": "waiting", "game_type": game_type})
                 .execute())[0]
     game_id = game["game_id"] # game_id is generated randomly by Postgres with gen_random_uuid()
 
@@ -384,6 +391,7 @@ def get_game_state(game_id: str, player_id: str) -> dict:
     state = {
         "game_id": game["game_id"],
         "status": game["status"],
+        "game_type": game["game_type"],
         "created_at": game["created_at"],
         "ended_at": game["ended_at"],
         "language": answer[0]["language"],
